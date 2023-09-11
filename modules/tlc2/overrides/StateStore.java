@@ -158,7 +158,7 @@ import tlc2.overrides.*;
  * Module overrides for operators to read and write JSON.
  */
 public class StateStore {
-
+	
 	static DB db;
 	static {
 		db = DB.New();
@@ -226,36 +226,52 @@ public class StateStore {
 	 */
 	private static JsonElement getNode(IValue value) throws IOException {
 		if (value instanceof RecordValue) {
-			return getObjectNode((RecordValue) value);
+			return getObjectNode((RecordValue) value, ValueTypeID.RecordValue);
 		} else if (value instanceof TupleValue) {
-			return getArrayNode((TupleValue) value);
+			return getArrayNode((TupleValue) value, ValueTypeID.TupleValue);
 		} else if (value instanceof StringValue) {
-			return new JsonPrimitive(((StringValue) value).val.toString());
+			return getJsonPrimitive(value, ValueTypeID.StringValue);
 		} else if (value instanceof ModelValue) {
-			return new JsonPrimitive(((ModelValue) value).val.toString());
+			return getJsonPrimitive(value, ValueTypeID.ModelValue);
 		} else if (value instanceof IntValue) {
-			return new JsonPrimitive(((IntValue) value).val);
+			return getJsonPrimitive(value, ValueTypeID.IntValue);
 		} else if (value instanceof BoolValue) {
-			return new JsonPrimitive(((BoolValue) value).val);
+			return getJsonPrimitive(value, ValueTypeID.BoolValue);
 		} else if (value instanceof FcnRcdValue) {
-			return getObjectNode((FcnRcdValue) value);
+			return getObjectNode((FcnRcdValue) value, ValueTypeID.FcnRcdValue);
 		} else if (value instanceof FcnLambdaValue) {
-			return getObjectNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd());
+			return getObjectNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd(), ValueTypeID.FcnLambdaValue);
 		} else if (value instanceof SetEnumValue) {
-			return getArrayNode((SetEnumValue) value);
+			return getArrayNode((SetEnumValue) value, ValueTypeID.SetEnumValue);
 		} else if (value instanceof SetOfRcdsValue) {
-			return getArrayNode((SetEnumValue) ((SetOfRcdsValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SetOfRcdsValue) value).toSetEnum(), ValueTypeID.SetOfRcdsValue);
 		} else if (value instanceof SetOfTuplesValue) {
-			return getArrayNode((SetEnumValue) ((SetOfTuplesValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SetOfTuplesValue) value).toSetEnum(), ValueTypeID.SetOfTuplesValue);
 		} else if (value instanceof SetOfFcnsValue) {
-			return getArrayNode((SetEnumValue) ((SetOfFcnsValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SetOfFcnsValue) value).toSetEnum(), ValueTypeID.SetOfFcnsValue);
 		} else if (value instanceof SubsetValue) {
-			return getArrayNode((SetEnumValue) ((SubsetValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SubsetValue) value).toSetEnum(), ValueTypeID.SubsetValue);
 		} else if (value instanceof IntervalValue) {
-			return getArrayNode((SetEnumValue) ((IntervalValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((IntervalValue) value).toSetEnum(), ValueTypeID.IntervalValue);
 		} else {
 			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
 		}
+	}
+
+	private static JsonElement getJsonPrimitive(IValue value, short id) throws IOException {
+		JsonPrimitive jsonPrimitive = null;
+		if (value instanceof StringValue) {
+			jsonPrimitive =  new JsonPrimitive(((StringValue) value).val.toString());
+		} else if (value instanceof ModelValue) {
+			jsonPrimitive = new JsonPrimitive(((ModelValue) value).val.toString());
+		} else if (value instanceof IntValue) {
+			jsonPrimitive = new JsonPrimitive(((IntValue) value).val);
+		} else if (value instanceof BoolValue) {
+			jsonPrimitive = new JsonPrimitive(((BoolValue) value).val);
+		} else {
+			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
+		}
+		return jsonElementSetTypeId(jsonPrimitive, id);
 	}
 
 	/**
@@ -288,13 +304,13 @@ public class StateStore {
 	 */
 	private static JsonElement getObjectNode(IValue value) throws IOException {
 		if (value instanceof RecordValue) {
-			return getObjectNode((RecordValue) value);
+			return getObjectNode((RecordValue) value, ValueTypeID.RecordValue);
 		} else if (value instanceof TupleValue) {
-			return getObjectNode((TupleValue) value);
+			return getObjectNode((TupleValue) value, ValueTypeID.TupleValue);
 		} else if (value instanceof FcnRcdValue) {
-			return getObjectNode((FcnRcdValue) value);
+			return getObjectNode((FcnRcdValue) value, ValueTypeID.FcnRcdValue);
 		} else if (value instanceof FcnLambdaValue) {
-			return getObjectNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd());
+			return getObjectNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd(), ValueTypeID.FcnRcdValue);
 		} else {
 			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
 		}
@@ -306,7 +322,7 @@ public class StateStore {
 	 * @param value the value to convert
 	 * @return the converted {@code JsonElement}
 	 */
-	private static JsonElement getObjectNode(FcnRcdValue value) throws IOException {
+	private static JsonElement getObjectNode(FcnRcdValue value, short id) throws IOException {
 		if (isValidSequence(value)) {
 			return getArrayNode(value);
 		}
@@ -321,7 +337,7 @@ public class StateStore {
 				jsonObject.add(domainValue.toString(), getNode(value.values[i]));
 			}
 		}
-		return jsonObject;
+		return jsonElementSetTypeId(jsonObject, id);
 	}
 
 	/**
@@ -330,12 +346,13 @@ public class StateStore {
 	 * @param value the value to convert
 	 * @return the converted {@code JsonElement}
 	 */
-	private static JsonElement getObjectNode(RecordValue value) throws IOException {
+	private static JsonElement getObjectNode(RecordValue value, short id) throws IOException {
 		JsonObject jsonObject = new JsonObject();
 		for (int i = 0; i < value.names.length; i++) {
 			jsonObject.add(value.names[i].toString(), getNode(value.values[i]));
 		}
-		return jsonObject;
+
+		return jsonElementSetTypeId(jsonObject, id);
 	}
 
 	/**
@@ -344,12 +361,12 @@ public class StateStore {
 	 * @param value the value to convert
 	 * @return the converted {@code JsonElement}
 	 */
-	private static JsonElement getObjectNode(TupleValue value) throws IOException {
+	private static JsonElement getObjectNode(TupleValue value, short id) throws IOException {
 		JsonObject jsonObject = new JsonObject();
 		for (int i = 0; i < value.elems.length; i++) {
 			jsonObject.add(String.valueOf(i), getNode(value.elems[i]));
 		}
-		return jsonObject;
+		return jsonElementSetTypeId(jsonObject, id);
 	}
 
 	/**
@@ -362,21 +379,21 @@ public class StateStore {
 		if (value instanceof TupleValue) {
 			return getArrayNode((TupleValue) value);
 		} else if (value instanceof FcnRcdValue) {
-			return getArrayNode((FcnRcdValue) value);
+			return getArrayNode((FcnRcdValue) value, ValueTypeId.FcnRcdValue);
 		} else if (value instanceof FcnLambdaValue) {
-			return getArrayNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd());
+			return getArrayNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd(), ValueTypeId.FcnLambdaValue);
 		} else if (value instanceof SetEnumValue) {
-			return getArrayNode((SetEnumValue) value);
+			return getArrayNode((SetEnumValue) value, ValueTypeId.SetEnumValue);
 		} else if (value instanceof SetOfRcdsValue) {
-			return getArrayNode((SetEnumValue) ((SetOfRcdsValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SetOfRcdsValue) value).toSetEnum(), ValueTypeId.SetOfRcdsValue);
 		} else if (value instanceof SetOfTuplesValue) {
-			return getArrayNode((SetEnumValue) ((SetOfTuplesValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SetOfTuplesValue) value).toSetEnum(), ValueTypeId.SetOfTuplesValue);
 		} else if (value instanceof SetOfFcnsValue) {
-			return getArrayNode((SetEnumValue) ((SetOfFcnsValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SetOfFcnsValue) value).toSetEnum(), ValueTypeId.SetOfFcnsValue);
 		} else if (value instanceof SubsetValue) {
-			return getArrayNode((SetEnumValue) ((SubsetValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((SubsetValue) value).toSetEnum(), ValueTypeId.SubsetValue);
 		} else if (value instanceof IntervalValue) {
-			return getArrayNode((SetEnumValue) ((IntervalValue) value).toSetEnum());
+			return getArrayNode((SetEnumValue) ((IntervalValue) value).toSetEnum(), ValueTypeId.IntervalValue);
 		} else {
 			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
 		}
@@ -388,12 +405,12 @@ public class StateStore {
 	 * @param value the value to convert
 	 * @return the converted {@code JsonElement}
 	 */
-	private static JsonElement getArrayNode(TupleValue value) throws IOException {
+	private static JsonElement getArrayNode(TupleValue value, short id) throws IOException {
 		JsonArray jsonArray = new JsonArray(value.elems.length);
 		for (int i = 0; i < value.elems.length; i++) {
 			jsonArray.add(getNode(value.elems[i]));
 		}
-		return jsonArray;
+		return jsonElementSetTypeId(jsonArray, id);
 	}
 
 	/**
@@ -402,7 +419,7 @@ public class StateStore {
 	 * @param value the value to convert
 	 * @return the converted {@code JsonElement}
 	 */
-	private static JsonElement getArrayNode(FcnRcdValue value) throws IOException {
+	private static JsonElement getArrayNode(FcnRcdValue value, short id) throws IOException {
 		if (!isValidSequence(value)) {
 			return getObjectNode(value);
 		}
@@ -412,7 +429,7 @@ public class StateStore {
 		for (int i = 0; i < value.values.length; i++) {
 			jsonArray.add(getNode(value.values[i]));
 		}
-		return jsonArray;
+		return jsonElementSetTypeId(jsonArray, id);
 	}
 
 	/**
@@ -421,14 +438,14 @@ public class StateStore {
 	 * @param value the value to convert
 	 * @return the converted {@code JsonElement}
 	 */
-	private static JsonElement getArrayNode(SetEnumValue value) throws IOException {
+	private static JsonElement getArrayNode(SetEnumValue value, short id) throws IOException {
 		value.normalize();
 		Value[] values = value.elems.toArray();
 		JsonArray jsonArray = new JsonArray(values.length);
 		for (int i = 0; i < values.length; i++) {
 			jsonArray.add(getNode(values[i]));
 		}
-		return jsonArray;
+		return jsonElementSetTypeId(jsonArray, id);
 	}
 
 	/**
@@ -502,5 +519,13 @@ public class StateStore {
 	@Deprecated
 	final static void resolves() {
 		// See TLCOverrides.java
+	}
+
+
+	private static JsonElement jsonElementSetTypeId(JsonElement value, short id) throws IOException {
+		JsonObject jsonObject = new JsonObject();
+		jsonObject.add("i", new JsonPrimitive(id));
+		jsonObject.add("v", value);
+		return jsonObject;
 	}
 }
