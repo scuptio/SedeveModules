@@ -157,4 +157,8 @@ ASSUME(LET ret == TXTDeserializeResult IN /\ ret.exitValue = 0
                                           /\ ret.stdout = payloadTXT
                                           /\ ret.stderr = "")
 
+
+value == [x|-> 1, y|-> 2]
+result == IOSerialize(value,  "/tmp/IOSerialize.txt", TRUE)
+ASSUME(result)
 =============================================================================
