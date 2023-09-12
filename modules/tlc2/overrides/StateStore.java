@@ -65,7 +65,6 @@ import tlc2.value.ValueConstants;
 import util.UniqueString;
 import tlc2.util.FP64;
 import tlc2.overrides.*;
-import tlc2.overrides.ValueTypeID;
 
 
  class DB {
@@ -164,6 +163,36 @@ public class StateStore {
 	static DB db;
 	static {
 		db = DB.New();
+	}
+
+	/**
+	 * Serializes a values to  JSON file.
+	 *
+	 * @param path  the file to which to write the values
+	 * @param value the values to write
+	 * @return a boolean value indicating whether the serialization was successful
+	 */
+	@TLAPlusOperator(identifier = "SerializeValue", module = "StateStore", warn = false)
+	public synchronized static BoolValue serialize(final StringValue path, final Value v) throws IOException {
+		String json_string = getNode(v).toString();
+		File file = new File(path.val.toString());
+		if (file.getParentFile() != null) {file.getParentFile().mkdirs();} // Cannot create parent dir for relative path.
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path.val.toString())))) {
+			writer.write(json_string);
+		}
+		return BoolValue.ValTrue;
+	}
+
+	/**
+	 * Deserializes a JSON values from the given path.
+	 *
+	 * @param path the JSON file path
+	 * @return a value
+	 */
+	@TLAPlusOperator(identifier = "DeserializeValue", module = "StateStore", warn = false)
+	public static Value deserialize(final StringValue path) throws IOException {
+		JsonElement node = JsonParser.parseReader(new FileReader(new File(path.val.toString())));
+		return getTypedValue(node);
 	}
 
 	/**
@@ -592,15 +621,6 @@ public class StateStore {
 		return new RecordValue(keys.toArray(new UniqueString[keys.size()]), values.toArray(new Value[values.size()]),
 				false);
 	}
-
-	/**
-	 * @deprecated It will be removed when this Class is moved to `TLC`.
-	 */
-	@Deprecated
-	final static void resolves() {
-		// See TLCOverrides.java
-	}
-
 
 	private static JsonElement jsonElementSetTypeId(JsonElement value, short id) throws IOException {
 		JsonObject jsonObject = new JsonObject();
