@@ -71,4 +71,4 @@ ant test
 Download
 --------
 
-![CI](https://github.com/tlaplus/CommunityModules/workflows/CI/badge.svg)
+![CI](https://github.com/scuptio/TLAPlusCommunityModules/workflows/CI/badge.svg)
