@@ -2,7 +2,7 @@
 
 UUID ==
   (*************************************************************************)
-  (* Generate a random UUID with its string representation.                                                            *)
+  (* Generate a random UUID with its string representation.                *)
   (*************************************************************************)
         TRUE
 
