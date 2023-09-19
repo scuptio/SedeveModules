@@ -20,6 +20,6 @@ EXTENDS SequencesExtTests,
         StatisticsTests,
         VectorClocksTests,
 		GraphVizTests,
-        StateStoreTests
-
+        StateStoreTests,
+        UUIDTests
 ===========================================

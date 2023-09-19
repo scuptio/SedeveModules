@@ -12,9 +12,23 @@ StoreOpen(path) ==
 StoreClose ==
     TRUE
 
+
+SerializeValue(path, val) ==
+  (*************************************************************************)
+  (* Serializes a values to  JSON file.                                    *)
+  (*************************************************************************)
+  TRUE
+
+DeserializeValue(path) ==
+  (*************************************************************************)
+  (* Deserializes a JSON values from the given path.                       *)
+  (*************************************************************************)
+  CHOOSE val : TRUE
+
+
 StoreValue(val) ==
   (*************************************************************************)
-  (* StoreValue store a tuple of values to the given file as (plain) JSON.       *)
+  (* StoreValue store a tuple of values to the given file as (plain) JSON. *)
   (* Records will be serialized as a JSON objects, and tuples as arrays.   *)
   (*************************************************************************)
   TRUE
