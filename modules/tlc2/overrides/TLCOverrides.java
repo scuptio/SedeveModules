@@ -46,8 +46,7 @@ public class TLCOverrides implements ITLCOverrides {
 			return new Class[] { IOUtils.class, SVG.class, SequencesExt.class, Json.class, Bitwise.class,
 					FiniteSetsExt.class, Functions.class, CSV.class, Combinatorics.class, BagsExt.class,
 					DyadicRationals.class, Statistics.class, VectorClocks.class, GraphViz.class,
-					StateStore.class
-
+					StateStore.class, GenUUID.class
 			};
 		} catch (NoClassDefFoundError e) {
 			// Remove this catch when this Class is moved to `TLC`.
@@ -57,7 +56,7 @@ public class TLCOverrides implements ITLCOverrides {
 		return new Class[] { IOUtils.class, SVG.class, SequencesExt.class, Bitwise.class, FiniteSetsExt.class,
 				Functions.class, CSV.class, Combinatorics.class, BagsExt.class, DyadicRationals.class,
 				Statistics.class, VectorClocks.class, GraphViz.class,
-				StateStore.class
+				StateStore.class, GenUUID.class
 		};
 	}
 }
