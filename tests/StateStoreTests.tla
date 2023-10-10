@@ -1,6 +1,6 @@
 ---- MODULE StateStoreTests ----
 
-EXTENDS StateStore, TLC, TLCExt, Integers, Sequences
+EXTENDS StateStore, FiniteSets, TLC, TLCExt, Integers, Sequences
 
 ASSUME LET T == INSTANCE TLC IN T!PrintT("StateStoreTests")
 
@@ -21,7 +21,7 @@ TestStore ==
        /\ StoreOpen("/tmp/state.db")
        /\ StoreValue(output)
        /\ LET input == LoadValue
-          IN  Len(input) = 3
+          IN  Cardinality(input) = 1
 
 ASSUME(TestStore)
 
