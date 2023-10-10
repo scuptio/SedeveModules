@@ -36,8 +36,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.Optional;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -123,25 +123,28 @@ import tlc2.overrides.*;
 		return this.map.containsKey(finger_print);
 	}
 
-	public Optional<RowResult> get()  {
+	public Vector<String> get()  {
+		Vector<String> vec = new Vector<>();
 		try {
 			ResultSet rs = this.prepared_query_stmt.executeQuery();
-			boolean ok = rs.next();
-			if (ok) {
-				long finger_print = rs.getLong(1);
-				String json_string = rs.getString(2);
-				RowResult row = new RowResult(finger_print, json_string);
-				return Optional.of(row);
-			} else {
-				System.err.println("fetch no rows");
+			while (true) {
+				boolean ok = rs.next();
+				if (ok) {
+					long finger_print = rs.getLong(1);
+					String json_string = rs.getString(2);
+					RowResult row = new RowResult(finger_print, json_string);
+					vec.add(row.json_string);
+				} else {
+					break;
+				}
 			}
 		} catch (SQLException e) {
 			System.err.println(e.getMessage());
 			e.printStackTrace();
 		}
-
-		return Optional.empty();
+		return vec;
 	}
+
 	public void put(long finger_print, String json_string) {
 		try {
 			this.prepared_insert_stmt.clearParameters();
@@ -225,10 +228,17 @@ public class StateStore {
 	 */
 	@TLAPlusOperator(identifier = "LoadValue", module = "StateStore", warn = false)
 	public synchronized static Value loadValue() throws IOException {
-		Optional<RowResult> row = StateStore.db.get();
-		RowResult record = row.get();
-		JsonElement node = JsonParser.parseString(record.json_string);
-		return getTypedValue(node);
+		Vector<String> rows = StateStore.db.get();
+		
+		List<Value> values = new ArrayList<>();
+
+		for (int i = 0; i < rows.size(); i++) {
+			String json_string = rows.get(i);
+			JsonElement json_element = JsonParser.parseString(json_string);
+			Value value = getTypedValue(json_element);
+			values.add(value);
+		}
+		return new SetEnumValue(values.toArray(new Value[values.size()]), true);
 	}
 
 	/**
