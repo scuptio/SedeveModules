@@ -315,7 +315,7 @@ ASSUME(ReplaceAllSubSeqs("\t", "%%", "Properly escape the %% char") = "Properly 
 ASSUME(ReplaceAllSubSeqs("\f", "%%", "Properly escape the %% char") = "Properly escape the \f char")
 ASSUME(ReplaceAllSubSeqs("\r", "%%", "Properly escape the %% char") = "Properly escape the \r char")
 
-ASSUME AssertEq(ReplaceAllSubSeqs("replaces", "%pattern%", "This %pattern% the pattern %pattern% multipe times"), "This replaces the pattern replaces multipe times")
+ASSUME AssertEq(ReplaceAllSubSeqs("replaces", "%pattern%", "This %pattern% the pattern %pattern% multiple times"), "This replaces the pattern replaces multiple times")
 ASSUME AssertEq(ReplaceAllSubSeqs("\\\\", "\\", "Properly escape the \\quotes"), "Properly escape the \\\\quotes")
 
 
@@ -362,4 +362,12 @@ ASSUME AssertEq(SelectInSubSeq(<<1,1,2,2>>, 2, 4, LAMBDA e : e = 2), 3)
 ASSUME AssertEq(SelectLastInSubSeq(<<>>, 1, Len(<<>>), Op), 0)
 ASSUME AssertEq(SelectLastInSubSeq(<<1,1,2>>  , 1, 3, LAMBDA e : e = 1), 2)
 ASSUME AssertEq(SelectLastInSubSeq(<<1,1,2,2>>, 2, 4, LAMBDA e : e = 2), 4)
+
+-----------------------------------------------------------------------------
+
+ASSUME AssertEq(Suffixes(<<>>), {<<>>})
+ASSUME AssertEq(Suffixes(<<1>>), {<<>>, <<1>>})
+ASSUME AssertEq(Suffixes(<<1,2>>), {<<>>, <<1,2>>, <<2>>})
+ASSUME AssertEq(Suffixes(<<1,2,3>>), {<<>>, <<3>>, <<2,3>>, <<1,2,3>>})
+
 =============================================================================
