@@ -6,19 +6,16 @@ ASSUME LET T == INSTANCE TLC IN T!PrintT("StateDBTests")
 
 
 \* Store and Load
-TestDB ==
+TestStore ==
     LET a1 == <<[b |-> "a"]>>
         a2 == <<[b |-> "b"]>>
     IN
        /\ DBOpen("/tmp/state.db")
        /\ Put(a1)
        /\ Put(a2)
-       /\ LET input == QueryAll
-          IN  /\ PrintT(input)
-              /\ PrintT(a1)
-              /\ PrintT(a1 \in input)
-              /\ PrintT(a2 \in input)
+       /\ LET s == QueryAll
+          IN  {a1, a2} = s
 
-ASSUME(TestDB)
+ASSUME(TestStore)
 
 ====
