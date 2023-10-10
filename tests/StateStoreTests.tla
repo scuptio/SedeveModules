@@ -16,12 +16,17 @@ ASSUME(TestSerialize)
 
 \* Store and Load
 TestStore ==
-    LET output == <<[a |-> 1, b |-> "a"], [a |-> 2, b |-> "b"], [a |-> 3, b |-> "c"]>>
+    LET a1 == <<[a |-> 1, b |-> "a"], [a |-> 2, b |-> "b"], [a |-> 3, b |-> "c"]>>
+        a2 == <<[c |-> 2]>>
     IN
        /\ StoreOpen("/tmp/state.db")
-       /\ StoreValue(output)
+       /\ StoreValue(a1)
+       /\ StoreValue(a2)
        /\ LET input == LoadValue
-          IN  Cardinality(input) = 1
+          IN  /\ PrintT(input)
+              /\ PrintT(a1)
+              /\ PrintT(a1 \in input)
+              /\ PrintT(a2 \in input)
 
 ASSUME(TestStore)
 
