@@ -25,6 +25,8 @@ package tlc2.overrides;
  *   Markus Alexander Kuppe - initial API and implementation
  ******************************************************************************/
 
+// modified from Json.java
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -70,9 +72,11 @@ import tlc2.overrides.*;
  class DB {
 	private String path = null;
 	private  Connection connection = null;
-	private  PreparedStatement prepared_insert_stmt = null;
 	private  ConcurrentHashMap<Long, Long> map = null;
-	private  PreparedStatement prepared_query_stmt = null;
+	private  PreparedStatement prepared_insert_state_stmt = null;
+	private  PreparedStatement prepared_query_state_stmt = null;
+	private  PreparedStatement prepared_put_value_stmt = null;
+	private  PreparedStatement prepared_get_value_stmt = null;
 	DB () {}
 
 	public void open(String path) {
@@ -85,13 +89,26 @@ import tlc2.overrides.*;
 			this.path = path;
 			this.map = new ConcurrentHashMap<>();
 			this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", path));
+			
 			Statement statement = this.connection.createStatement();
-			statement.executeUpdate("drop table if exists state");
-			statement.executeUpdate("create table state (finger_print long primary key, json_string string)");
+			statement.executeUpdate("drop table if exists state;");
+			statement.executeUpdate("drop table if exists store;");
+			statement.executeUpdate("create table state (finger_print long primary key, json_string string);");
+			statement.executeUpdate("create table store (named_key string primary key, json_string string);");
+			
 			String insert_stmt = "insert into state values(?, ?);";
+			this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
+			
 			String query_stmt = "select finger_print, json_string from state;";
-			this.prepared_insert_stmt = this.connection.prepareStatement(insert_stmt);
-			this.prepared_query_stmt = this.connection.prepareStatement(query_stmt);
+			this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
+			
+			String put_stmt = "insert into store values(?, ?) "
+					+ "on conflict(named_key) do update set json_string = ?;";
+			this.prepared_put_value_stmt = this.connection.prepareStatement(put_stmt);
+			
+			
+			String get_stmt = "select json_string from store where named_key = ?;";
+			this.prepared_get_value_stmt = this.connection.prepareStatement(get_stmt);
 
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -126,7 +143,7 @@ import tlc2.overrides.*;
 	public Vector<String> get()  {
 		Vector<String> vec = new Vector<>();
 		try {
-			ResultSet rs = this.prepared_query_stmt.executeQuery();
+			ResultSet rs = this.prepared_query_state_stmt.executeQuery();
 			while (true) {
 				boolean ok = rs.next();
 				if (ok) {
@@ -140,20 +157,54 @@ import tlc2.overrides.*;
 			System.err.println(e.getMessage());
 			e.printStackTrace();
 		}
+
 		return vec;
 	}
 
 	public void put(long finger_print, String json_string) {
 		try {
-			this.prepared_insert_stmt.clearParameters();
-			this.prepared_insert_stmt.setLong(1, finger_print);
-			this.prepared_insert_stmt.setString(2, json_string);
-			this.prepared_insert_stmt.execute();
+			this.prepared_insert_state_stmt.clearParameters();
+			this.prepared_insert_state_stmt.setLong(1, finger_print);
+			this.prepared_insert_state_stmt.setString(2, json_string);
+			this.prepared_insert_state_stmt.execute();
 		} catch (SQLException e) {
 			System.err.println(e.getMessage());
 			e.printStackTrace();
 		}
 		map.put(finger_print,  finger_print);
+	}
+	
+	public void put_value(String name, String json_string) {
+		try {
+			this.prepared_put_value_stmt.clearParameters();
+			this.prepared_put_value_stmt.setString(1, name);
+			this.prepared_put_value_stmt.setString(2, json_string);
+			this.prepared_put_value_stmt.setString(3, json_string);
+			this.prepared_put_value_stmt.execute();
+		} catch (SQLException e) {
+			System.err.println(e.getMessage());
+			e.printStackTrace();
+		}
+	}
+	
+	
+	public String get_value(String name) {
+		try {
+			this.prepared_get_value_stmt.clearParameters();
+			this.prepared_get_value_stmt.setString(1, name);
+			ResultSet rs = this.prepared_get_value_stmt.executeQuery();
+			boolean ok = rs.next();
+			if (ok) {
+				String json_string = rs.getString(1);
+				return json_string;
+			} else {
+				return null;
+			}
+		} catch (SQLException e) {
+			System.err.println(e.getMessage());
+			e.printStackTrace();
+		}
+		return null;
 	}
 }
 /**
@@ -172,7 +223,7 @@ public class StateDB {
 	 * @param path  the db file path to which to write
 	 */
 	@TLAPlusOperator(identifier = "DBOpen", module = "StateDB", warn = false)
-	public synchronized static BoolValue storeOpen(final StringValue path) throws IOException {
+	public synchronized static BoolValue dbOpen(final StringValue path) throws IOException {
 		StateDB.db.open(path.val.toString());
 		return BoolValue.ValTrue;
 	}
@@ -183,18 +234,16 @@ public class StateDB {
 	 * @param path  the db file path to which to write
 	 */
 	@TLAPlusOperator(identifier = "DBClose", module = "StateDB", warn = false)
-	public synchronized static BoolValue storeClose() throws IOException {
+	public synchronized static BoolValue dbClose() throws IOException {
 		StateDB.db.close();
 		return BoolValue.ValTrue;
 	}
 
 	/**
-	 * Deserializes a tuple of *plain* JSON values from the given path.
+	 * Query all states and return a set.
 	 *
-	 * @param path the JSON file path
-	 * @return a tuple of JSON values
 	 */
-	@TLAPlusOperator(identifier = "QueryAll", module = "StateDB", warn = false)
+	@TLAPlusOperator(identifier = "QueryAllStates", module = "StateDB", warn = false)
 	public synchronized static Value queryAllValues() throws IOException {
 		Vector<String> rows = StateDB.db.get();
 		
@@ -212,23 +261,50 @@ public class StateDB {
 	}
 
 	/**
-	 * Serializes a tuple of values to newline delimited JSON.
+	 * Store a state to database.
 	 *
-	 * @param path  the file to which to write the values
-	 * @param value the values to write
-	 * @return a boolean value indicating whether the serialization was successful
+	 * @param path  state value
 	 */
-	@TLAPlusOperator(identifier = "Put", module = "StateDB", warn = false)
-	public synchronized static BoolValue putValue(final Value v) throws IOException {
-		long finger_print = v.fingerPrint(FP64.New());
+	@TLAPlusOperator(identifier = "CreateState", module = "StateDB", warn = false)
+	public synchronized static BoolValue newState(final Value state) throws IOException {
+		long finger_print = state.fingerPrint(FP64.New());
 		if (!StateDB.db.contains(finger_print)) {
-			String json_string = getNode(v).toString();
+			String json_string = getNode(state).toString();
 			StateDB.db.put(finger_print, json_string);
 		}
 
 		return BoolValue.ValTrue;
 	}
 
+	
+	/**
+	 * Read a named value from database.
+	 *
+	 * @param name
+	 */
+	@TLAPlusOperator(identifier = "LoadValue", module = "StateDB", warn = false)
+	public synchronized static Value getValue(final StringValue name) throws IOException {
+		String s = name.toString();
+		String json_string = StateDB.db.get_value(s);
+		JsonElement json_element = JsonParser.parseString(json_string);
+		Value value = getTypedValue(json_element);
+		return value;
+	}
+
+	/**
+	 * Save a named value t database.
+	 *
+	 * @param name
+	 * @param value
+	 */
+	@TLAPlusOperator(identifier = "StoreValue", module = "StateDB", warn = false)
+	public synchronized static BoolValue putValue(final StringValue name, final Value value) throws IOException {
+		String s = name.toString();
+		String json_string = getNode(value).toString();
+		StateDB.db.put_value(s, json_string);
+		return BoolValue.ValTrue;
+	}
+	
 	/**
 	 * Recursively converts the given value to a {@code JsonElement}.
 	 *
