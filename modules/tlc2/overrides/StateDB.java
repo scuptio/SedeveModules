@@ -71,7 +71,7 @@ import tlc2.overrides.*;
 	private String path = null;
 	private  Connection connection = null;
 	private  PreparedStatement prepared_insert_stmt = null;
-	private  ConcurrentHashMap<Long, String> map = null;
+	private  ConcurrentHashMap<Long, Long> map = null;
 	private  PreparedStatement prepared_query_stmt = null;
 	DB () {}
 
@@ -87,7 +87,7 @@ import tlc2.overrides.*;
 			this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", path));
 			Statement statement = this.connection.createStatement();
 			statement.executeUpdate("drop table if exists state");
-			statement.executeUpdate("create table state (finger_print long, json_string string)");
+			statement.executeUpdate("create table state (finger_print long primary key, json_string string)");
 			String insert_stmt = "insert into state values(?, ?);";
 			String query_stmt = "select finger_print, json_string from state;";
 			this.prepared_insert_stmt = this.connection.prepareStatement(insert_stmt);
@@ -130,10 +130,8 @@ import tlc2.overrides.*;
 			while (true) {
 				boolean ok = rs.next();
 				if (ok) {
-					long finger_print = rs.getLong(1);
 					String json_string = rs.getString(2);
-					RowResult row = new RowResult(finger_print, json_string);
-					vec.add(row.json_string);
+					vec.add(json_string);
 				} else {
 					break;
 				}
@@ -155,13 +153,13 @@ import tlc2.overrides.*;
 			System.err.println(e.getMessage());
 			e.printStackTrace();
 		}
-		map.put(finger_print,  json_string);
+		map.put(finger_print,  finger_print);
 	}
 }
 /**
  * Module overrides for operators to read and write JSON.
  */
-public class StateStore {
+public class StateDB {
 	
 	static DB db;
 	static {
@@ -169,43 +167,13 @@ public class StateStore {
 	}
 
 	/**
-	 * Serializes a values to  JSON file.
-	 *
-	 * @param path  the file to which to write the values
-	 * @param value the values to write
-	 * @return a boolean value indicating whether the serialization was successful
-	 */
-	@TLAPlusOperator(identifier = "SerializeValue", module = "StateStore", warn = false)
-	public synchronized static BoolValue serialize(final StringValue path, final Value v) throws IOException {
-		String json_string = getNode(v).toString();
-		File file = new File(path.val.toString());
-		if (file.getParentFile() != null) {file.getParentFile().mkdirs();} // Cannot create parent dir for relative path.
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path.val.toString())))) {
-			writer.write(json_string);
-		}
-		return BoolValue.ValTrue;
-	}
-
-	/**
-	 * Deserializes a JSON values from the given path.
-	 *
-	 * @param path the JSON file path
-	 * @return a value
-	 */
-	@TLAPlusOperator(identifier = "DeserializeValue", module = "StateStore", warn = false)
-	public static Value deserialize(final StringValue path) throws IOException {
-		JsonElement node = JsonParser.parseReader(new FileReader(new File(path.val.toString())));
-		return getTypedValue(node);
-	}
-
-	/**
 	 * Open storage.
 	 *
 	 * @param path  the db file path to which to write
 	 */
-	@TLAPlusOperator(identifier = "StoreOpen", module = "StateStore", warn = false)
+	@TLAPlusOperator(identifier = "DBOpen", module = "StateDB", warn = false)
 	public synchronized static BoolValue storeOpen(final StringValue path) throws IOException {
-		StateStore.db.open(path.val.toString());
+		StateDB.db.open(path.val.toString());
 		return BoolValue.ValTrue;
 	}
 
@@ -214,9 +182,9 @@ public class StateStore {
 	 *
 	 * @param path  the db file path to which to write
 	 */
-	@TLAPlusOperator(identifier = "StoreClose", module = "StateStore", warn = false)
+	@TLAPlusOperator(identifier = "DBClose", module = "StateDB", warn = false)
 	public synchronized static BoolValue storeClose() throws IOException {
-		StateStore.db.close();
+		StateDB.db.close();
 		return BoolValue.ValTrue;
 	}
 
@@ -226,9 +194,9 @@ public class StateStore {
 	 * @param path the JSON file path
 	 * @return a tuple of JSON values
 	 */
-	@TLAPlusOperator(identifier = "LoadValue", module = "StateStore", warn = false)
-	public synchronized static Value loadValue() throws IOException {
-		Vector<String> rows = StateStore.db.get();
+	@TLAPlusOperator(identifier = "QueryAll", module = "StateDB", warn = false)
+	public synchronized static Value queryAllValues() throws IOException {
+		Vector<String> rows = StateDB.db.get();
 		
 		List<Value> values = new ArrayList<>();
 
@@ -238,7 +206,9 @@ public class StateStore {
 			Value value = getTypedValue(json_element);
 			values.add(value);
 		}
-		return new SetEnumValue(values.toArray(new Value[values.size()]), true);
+		SetEnumValue set = new SetEnumValue(values.toArray(new Value[values.size()]), false);
+		set.normalize();
+		return set ;
 	}
 
 	/**
@@ -248,12 +218,12 @@ public class StateStore {
 	 * @param value the values to write
 	 * @return a boolean value indicating whether the serialization was successful
 	 */
-	@TLAPlusOperator(identifier = "StoreValue", module = "StateStore", warn = false)
-	public synchronized static BoolValue storeValue(final Value v) throws IOException {
+	@TLAPlusOperator(identifier = "Put", module = "StateDB", warn = false)
+	public synchronized static BoolValue putValue(final Value v) throws IOException {
 		long finger_print = v.fingerPrint(FP64.New());
-		if (!StateStore.db.contains(finger_print)) {
+		if (!StateDB.db.contains(finger_print)) {
 			String json_string = getNode(v).toString();
-			StateStore.db.put(finger_print, json_string);
+			StateDB.db.put(finger_print, json_string);
 		}
 
 		return BoolValue.ValTrue;
