@@ -14,10 +14,7 @@ TestDB ==
        /\ Put(a1)
        /\ Put(a2)
        /\ LET input == QueryAll
-          IN  /\ PrintT(input)
-              /\ PrintT(a1)
-              /\ PrintT(a1 \in input)
-              /\ PrintT(a2 \in input)
+=====
 
 ASSUME(TestDB)
 
