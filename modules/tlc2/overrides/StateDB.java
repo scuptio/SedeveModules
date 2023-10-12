@@ -39,7 +39,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -72,7 +71,6 @@ import tlc2.overrides.*;
  class DB {
 	private String path = null;
 	private  Connection connection = null;
-	private  ConcurrentHashMap<Long, Long> map = null;
 	private  PreparedStatement prepared_insert_state_stmt = null;
 	private  PreparedStatement prepared_query_state_stmt = null;
 	private  PreparedStatement prepared_put_value_stmt = null;
@@ -87,19 +85,17 @@ import tlc2.overrides.*;
 
 
 			this.path = path;
-			this.map = new ConcurrentHashMap<>();
 			this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", path));
 			
 			Statement statement = this.connection.createStatement();
-			statement.executeUpdate("drop table if exists state;");
-			statement.executeUpdate("drop table if exists store;");
-			statement.executeUpdate("create table state (finger_print long primary key, json_string string);");
-			statement.executeUpdate("create table store (named_key string primary key, json_string string);");
+			statement.executeUpdate("create table if not exists state (json_string string primary key);");
+			statement.executeUpdate("create table if not exists store (named_key string primary key, json_string string);");
 			
-			String insert_stmt = "insert into state values(?, ?);";
+			String insert_stmt = "insert into state values(?)"
+					+ "on conflict(json_string) do nothing;";
 			this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
 			
-			String query_stmt = "select finger_print, json_string from state;";
+			String query_stmt = "select json_string from state;";
 			this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
 			
 			String put_stmt = "insert into store values(?, ?) "
@@ -136,10 +132,6 @@ import tlc2.overrides.*;
 		return db;
 	}
 
-	public boolean contains(long finger_print) {
-		return this.map.containsKey(finger_print);
-	}
-
 	public Vector<String> get()  {
 		Vector<String> vec = new Vector<>();
 		try {
@@ -147,7 +139,7 @@ import tlc2.overrides.*;
 			while (true) {
 				boolean ok = rs.next();
 				if (ok) {
-					String json_string = rs.getString(2);
+					String json_string = rs.getString(1);
 					vec.add(json_string);
 				} else {
 					break;
@@ -161,17 +153,15 @@ import tlc2.overrides.*;
 		return vec;
 	}
 
-	public void put(long finger_print, String json_string) {
+	public void put(String json_string) {
 		try {
 			this.prepared_insert_state_stmt.clearParameters();
-			this.prepared_insert_state_stmt.setLong(1, finger_print);
-			this.prepared_insert_state_stmt.setString(2, json_string);
+			this.prepared_insert_state_stmt.setString(1, json_string);
 			this.prepared_insert_state_stmt.execute();
 		} catch (SQLException e) {
 			System.err.println(e.getMessage());
 			e.printStackTrace();
 		}
-		map.put(finger_print,  finger_print);
 	}
 	
 	public void put_value(String name, String json_string) {
@@ -267,12 +257,9 @@ public class StateDB {
 	 */
 	@TLAPlusOperator(identifier = "CreateState", module = "StateDB", warn = false)
 	public synchronized static BoolValue newState(final Value state) throws IOException {
-		long finger_print = state.fingerPrint(FP64.New());
-		if (!StateDB.db.contains(finger_print)) {
-			String json_string = getNode(state).toString();
-			StateDB.db.put(finger_print, json_string);
-		}
-
+		state.normalize();
+		String json_string = getNode(state).toString();
+		StateDB.db.put(json_string);
 		return BoolValue.ValTrue;
 	}
 
