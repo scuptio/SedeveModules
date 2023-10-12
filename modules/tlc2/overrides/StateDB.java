@@ -120,15 +120,14 @@ import tlc2.overrides.*;
 	}
 
 	static DB New() {
+		DB db = new DB();
 		String env_name = "STATE_STORE";
-		String path = "state_store.db";
 		Map<String, String> env = System.getenv();
 		if (env.containsKey(env_name)) {
-			path = env.get(env_name);
+			String path = env.get(env_name);
+			db.open(path);
 		}
 
-		DB db = new DB();
-		db.open(path);
 		return db;
 	}
 
