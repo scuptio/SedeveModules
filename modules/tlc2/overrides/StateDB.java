@@ -258,6 +258,33 @@ public class StateDB {
 	public synchronized static BoolValue newState(final Value state) throws IOException {
 		state.normalize();
 		String json_string = getNode(state).toString();
+		json_string.replaceAll("\\s+","");
+		String s = "{\n"
+				+ "                    \"kind\": 9,\n"
+				+ "                    \"object\": [\n"
+				+ "                        {\n"
+				+ "                            \"kind\": 4,\n"
+				+ "                            \"object\": {\n"
+				+ "                                \"term\": {\n"
+				+ "                                    \"kind\": 1,\n"
+				+ "                                    \"object\": 2\n"
+				+ "                                },\n"
+				+ "                                \"index\": {\n"
+				+ "                                    \"kind\": 1,\n"
+				+ "                                    \"object\": 1\n"
+				+ "                                },\n"
+				+ "                                \"value\": {\n"
+				+ "                                    \"kind\": 21,\n"
+				+ "                                    \"object\": \"A_v1\"\n"
+				+ "                                }\n"
+				+ "                            }\n"
+				+ "                        }\n"
+				+ "                    ]\n"
+				+ "                }".replaceAll("\\s+","");
+		if (json_string.contains(s)) {
+			System.out.println(json_string);
+			String j = getNode(state).toString();
+		}
 		StateDB.db.put(json_string);
 		return BoolValue.ValTrue;
 	}
@@ -488,6 +515,9 @@ public class StateDB {
 	 * @return the converted {@code JsonElement}
 	 */
 	private static JsonElement getArrayNode(TupleValue value) throws IOException {
+		if (value.getKind() != ValueConstants.TUPLEVALUE) {
+			throw new IOException("errory tuple value type");
+		}
 		JsonArray jsonArray = new JsonArray(value.elems.length);
 		for (int i = 0; i < value.elems.length; i++) {
 			jsonArray.add(getNode(value.elems[i]));
