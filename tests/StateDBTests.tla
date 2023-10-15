@@ -1,26 +1,10 @@
 ---- MODULE StateDBTests ----
 
-EXTENDS StateDB, FiniteSets, TLC, TLCExt, Integers, Sequences
+EXTENDS StateDB, FiniteSets, TLC, TLCExt, Integers, Sequences, SequencesExt
 
 ASSUME LET T == INSTANCE TLC IN T!PrintT("StateDBTests")
 
 
-\* Test create and query states
-TestState ==
-    LET a1 == <<[b |-> "a"]>>
-        a2 == <<[b |-> "b"]>>
-    IN
-       /\ DBOpen("/tmp/state.db")
-       /\ CreateState(a1)
-       /\ CreateState(a2)
-       /\ LET s == QueryAllStates
-          IN {a1, a2} = s
-
-	   
-ASSUME(TestState)
-
-
-\* Test store and load value
 TestStoreLoad ==
     LET a == "a"
         b == "b"
@@ -33,5 +17,30 @@ TestStoreLoad ==
 
 	   
 ASSUME(TestStoreLoad)
+
+
+TestState ==
+
+       /\ DBOpen("/tmp/state.db")
+       /\ LET 
+	   			node_id == {"n1", "n2"}
+	   			value == {"v1", "v2"}
+				entry == [
+					term : {1},
+					index: {1},
+					value : value
+				]
+				log == {
+					[
+			       		log |-> [
+			       			i \in node_id |-> x
+			       		] 
+					] : x \in  SetToAllKPermutations(entry)
+				}
+	   IN /\ \A l \in log : CreateState(l)
+	      /\ LET s == QueryAllStates
+	         IN /\ s = log
+				
+ASSUME(TestState)
 
 ====

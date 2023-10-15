@@ -88,11 +88,11 @@ import tlc2.overrides.*;
 			this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", path));
 			
 			Statement statement = this.connection.createStatement();
-			statement.executeUpdate("create table if not exists state (json_string string primary key);");
+			statement.executeUpdate("create table if not exists state (finger_print long primary key, json_string string);");
 			statement.executeUpdate("create table if not exists store (named_key string primary key, json_string string);");
 			
-			String insert_stmt = "insert into state values(?)"
-					+ "on conflict(json_string) do nothing;";
+			String insert_stmt = "insert into state values(?, ?)"
+					+ "on conflict(finger_print) do update set json_string = ?;";
 			this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
 			
 			String query_stmt = "select json_string from state;";
@@ -152,10 +152,12 @@ import tlc2.overrides.*;
 		return vec;
 	}
 
-	public void put(String json_string) {
+	public void new_state(long finger_print, String json_string) {
 		try {
 			this.prepared_insert_state_stmt.clearParameters();
-			this.prepared_insert_state_stmt.setString(1, json_string);
+			this.prepared_insert_state_stmt.setLong(1, finger_print);
+			this.prepared_insert_state_stmt.setString(2, json_string);
+			this.prepared_insert_state_stmt.setString(3, json_string);
 			this.prepared_insert_state_stmt.execute();
 		} catch (SQLException e) {
 			System.err.println(e.getMessage());
@@ -257,35 +259,9 @@ public class StateDB {
 	@TLAPlusOperator(identifier = "CreateState", module = "StateDB", warn = false)
 	public synchronized static BoolValue newState(final Value state) throws IOException {
 		state.normalize();
+		long fp = state.fingerPrint(FP64.New());
 		String json_string = getNode(state).toString();
-		json_string.replaceAll("\\s+","");
-		String s = "{\n"
-				+ "                    \"kind\": 9,\n"
-				+ "                    \"object\": [\n"
-				+ "                        {\n"
-				+ "                            \"kind\": 4,\n"
-				+ "                            \"object\": {\n"
-				+ "                                \"term\": {\n"
-				+ "                                    \"kind\": 1,\n"
-				+ "                                    \"object\": 2\n"
-				+ "                                },\n"
-				+ "                                \"index\": {\n"
-				+ "                                    \"kind\": 1,\n"
-				+ "                                    \"object\": 1\n"
-				+ "                                },\n"
-				+ "                                \"value\": {\n"
-				+ "                                    \"kind\": 21,\n"
-				+ "                                    \"object\": \"A_v1\"\n"
-				+ "                                }\n"
-				+ "                            }\n"
-				+ "                        }\n"
-				+ "                    ]\n"
-				+ "                }".replaceAll("\\s+","");
-		if (json_string.contains(s)) {
-			System.out.println(json_string);
-			String j = getNode(state).toString();
-		}
-		StateDB.db.put(json_string);
+		StateDB.db.new_state(fp, json_string);
 		return BoolValue.ValTrue;
 	}
 
@@ -649,6 +625,13 @@ public class StateDB {
 	private static FcnRcdValue getFcnRcdValue(JsonElement node) throws IOException {
 		List<Value> keys = new ArrayList<>();
 		List<Value> values = new ArrayList<>();
+		if (node.isJsonArray()) {
+			JsonArray array = node.getAsJsonArray();
+			if (array.size() == 0) {
+				return (FcnRcdValue)FcnRcdValue.EmptyFcn;
+			}
+		}
+		
 		Iterator<Map.Entry<String, JsonElement>> iterator = node.getAsJsonObject().entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<String, JsonElement> entry = iterator.next();
