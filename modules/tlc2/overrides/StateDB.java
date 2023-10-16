@@ -416,11 +416,18 @@ public class StateDB {
 		final Value[] domain = value.getDomainAsValues();
 		JsonObject jsonObject = new JsonObject();
 		for (int i = 0; i < domain.length; i++) {
+			JsonObject object = new JsonObject();
 			Value domainValue = domain[i];
+			JsonElement domainElement = getNode(domainValue);
+			object.add("domain",domainElement);
+			
+			JsonElement valueElement = getNode(value.values[i]);
+			object.add("value",valueElement);
+			
 			if (domainValue instanceof StringValue) {
-				jsonObject.add(((StringValue) domainValue).val.toString(), getNode(value.values[i]));
+				jsonObject.add(((StringValue) domainValue).val.toString(), object);
 			} else {
-				jsonObject.add(domainValue.toString(), getNode(value.values[i]));
+				jsonObject.add(domainValue.toString(), object);
 			}
 		}
 		return jsonElementSetTypeId(jsonObject, value.getKind());
@@ -636,8 +643,12 @@ public class StateDB {
 		Iterator<Map.Entry<String, JsonElement>> iterator = node.getAsJsonObject().entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<String, JsonElement> entry = iterator.next();
-			keys.add(new StringValue(entry.getKey()));
-			values.add(getTypedValue(entry.getValue()));
+			JsonObject element = entry.getValue().getAsJsonObject();
+			JsonElement domain = element.get("domain");
+			JsonElement value = element.get("value");
+			
+			keys.add(getTypedValue(domain));
+			values.add(getTypedValue(value));
 		}
 		return new FcnRcdValue(keys.toArray(new Value[keys.size()]), values.toArray(new Value[values.size()]),
 				true);
