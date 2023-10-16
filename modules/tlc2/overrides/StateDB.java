@@ -408,8 +408,9 @@ public class StateDB {
 	 * @return the converted {@code JsonElement}
 	 */
 	private static JsonElement getObjectNode(FcnRcdValue value) throws IOException {
-		if (isValidSequence(value)) {
-			return getArrayNode(value);
+		Value tuple_value = value.toTuple();
+		if (tuple_value != null && ((TupleValue)tuple_value).size() != 0) {
+			return getArrayNode((TupleValue)tuple_value);
 		}
 
 		final Value[] domain = value.getDomainAsValues();
