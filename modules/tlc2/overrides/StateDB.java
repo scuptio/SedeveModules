@@ -260,17 +260,7 @@ public class StateDB {
 	public synchronized static BoolValue newState(final Value state) throws IOException {
 		state.normalize();
 		long fp = state.fingerPrint(FP64.New());
-		
 		String json_string = getNode(state).toString();
-		try {
-			JsonElement json_element = JsonParser.parseString(json_string);
-			Value value = getTypedValue(json_element);
-		} catch (Exception ex) {
-			System.out.println(json_string);
-			System.out.println(ex.getMessage());
-			String s = getNode(state).toString();
-			System.out.println(s);
-		}
 		StateDB.db.new_state(fp, json_string);
 		return BoolValue.ValTrue;
 	}
@@ -458,9 +448,6 @@ public class StateDB {
 	 * @return the converted {@code JsonElement}
 	 */
 	private static JsonElement getObjectNode(TupleValue value) throws IOException {
-		if (value.elems.length == 0) {
-			
-		}
 		JsonObject jsonObject = new JsonObject();
 		for (int i = 0; i < value.elems.length; i++) {
 			jsonObject.add(String.valueOf(i), getNode(value.elems[i]));
