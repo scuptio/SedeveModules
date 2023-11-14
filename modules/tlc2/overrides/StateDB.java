@@ -27,11 +27,8 @@ package tlc2.overrides;
 
 // modified from Json.java
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
+
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
@@ -73,8 +70,7 @@ import tlc2.value.impl.Value;
 import tlc2.value.ValueConstants;
 import util.UniqueString;
 import tlc2.util.FP64;
-import tlc2.overrides.*;
-import tlc2.overrides.DB._DB;
+
 
 class DB extends Thread {
 	class _Command {
@@ -135,8 +131,7 @@ class DB extends Thread {
 		private Connection connection = null;
 		private PreparedStatement prepared_insert_state_stmt = null;
 		private PreparedStatement prepared_query_state_stmt = null;
-		private PreparedStatement prepared_put_value_stmt = null;
-		private PreparedStatement prepared_get_value_stmt = null;
+
 
 		public _DB(String path) {
 			this.path = path;
@@ -161,14 +156,6 @@ class DB extends Thread {
 
 				String query_stmt = "select json_string from state;";
 				this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
-
-				String put_stmt = "insert into store values(?, ?) "
-						+ "on conflict(named_key) do update set json_string = ?;";
-				this.prepared_put_value_stmt = this.connection.prepareStatement(put_stmt);
-
-				String get_stmt = "select json_string from store where named_key = ?;";
-				this.prepared_get_value_stmt = this.connection.prepareStatement(get_stmt);
-
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -417,47 +404,6 @@ public class StateDB {
 		return jsonElementSetTypeId(jsonPrimitive, kind);
 	}
 
-	/**
-	 * Returns a boolean indicating whether the given value is a valid sequence.
-	 *
-	 * @param value the value to check
-	 * @return indicates whether the value is a valid sequence
-	 */
-	private static boolean isValidSequence(FcnRcdValue value) {
-		final Value[] domain = value.getDomainAsValues();
-		for (Value d : domain) {
-			if (!(d instanceof IntValue)) {
-				return false;
-			}
-		}
-		value.normalize();
-		for (int i = 0; i < domain.length; i++) {
-			if (((IntValue) domain[i]).val != (i + 1)) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	/**
-	 * Recursively converts the given value to an {@code JsonObject}.
-	 *
-	 * @param value the value to convert
-	 * @return the converted {@code JsonElement}
-	 */
-	private static JsonElement getObjectNode(IValue value) throws IOException {
-		if (value instanceof RecordValue) {
-			return getObjectNode((RecordValue) value);
-		} else if (value instanceof TupleValue) {
-			return getObjectNode((TupleValue) value);
-		} else if (value instanceof FcnRcdValue) {
-			return getObjectNode((FcnRcdValue) value);
-		} else if (value instanceof FcnLambdaValue) {
-			return getObjectNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd());
-		} else {
-			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
-		}
-	}
 
 	/**
 	 * Converts the given record value to a {@code JsonObject}, recursively
@@ -508,50 +454,6 @@ public class StateDB {
 	}
 
 	/**
-	 * Converts the given tuple value to an {@code JsonObject}.
-	 *
-	 * @param value the value to convert
-	 * @return the converted {@code JsonElement}
-	 */
-	private static JsonElement getObjectNode(TupleValue value) throws IOException {
-		JsonObject jsonObject = new JsonObject();
-		for (int i = 0; i < value.elems.length; i++) {
-			jsonObject.add(String.valueOf(i), getNode(value.elems[i]));
-		}
-		return jsonElementSetTypeId(jsonObject, value.getKind());
-	}
-
-	/**
-	 * Recursively converts the given value to an {@code JsonArray}.
-	 *
-	 * @param value the value to convert
-	 * @return the converted {@code JsonElement}
-	 */
-	private static JsonElement getArrayNode(IValue value) throws IOException {
-		if (value instanceof TupleValue) {
-			return getArrayNode((TupleValue) value);
-		} else if (value instanceof FcnRcdValue) {
-			return getArrayNode((FcnRcdValue) value);
-		} else if (value instanceof FcnLambdaValue) {
-			return getArrayNode((FcnRcdValue) ((FcnLambdaValue) value).toFcnRcd());
-		} else if (value instanceof SetEnumValue) {
-			return getArrayNode((SetEnumValue) value);
-		} else if (value instanceof SetOfRcdsValue) {
-			return getArrayNode((SetEnumValue) ((SetOfRcdsValue) value).toSetEnum());
-		} else if (value instanceof SetOfTuplesValue) {
-			return getArrayNode((SetEnumValue) ((SetOfTuplesValue) value).toSetEnum());
-		} else if (value instanceof SetOfFcnsValue) {
-			return getArrayNode((SetEnumValue) ((SetOfFcnsValue) value).toSetEnum());
-		} else if (value instanceof SubsetValue) {
-			return getArrayNode((SetEnumValue) ((SubsetValue) value).toSetEnum());
-		} else if (value instanceof IntervalValue) {
-			return getArrayNode((SetEnumValue) ((IntervalValue) value).toSetEnum());
-		} else {
-			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
-		}
-	}
-
-	/**
 	 * Converts the given tuple value to an {@code JsonArray}.
 	 *
 	 * @param value the value to convert
@@ -565,26 +467,6 @@ public class StateDB {
 		for (int i = 0; i < value.elems.length; i++) {
 			jsonArray.add(getNode(value.elems[i]));
 		}
-		return jsonElementSetTypeId(jsonArray, value.getKind());
-	}
-
-	/**
-	 * Converts the given record value to an {@code JsonArray}.
-	 *
-	 * @param value the value to convert
-	 * @return the converted {@code JsonElement}
-	 */
-	private static JsonElement getArrayNode(FcnRcdValue value) throws IOException {
-		if (!isValidSequence(value)) {
-			return getObjectNode(value);
-		}
-
-		value.normalize();
-		JsonArray jsonArray = new JsonArray(value.values.length);
-		for (int i = 0; i < value.values.length; i++) {
-			jsonArray.add(getNode(value.values[i]));
-		}
-
 		return jsonElementSetTypeId(jsonArray, value.getKind());
 	}
 
@@ -634,32 +516,6 @@ public class StateDB {
 			throw new IOException("Unknown value kind :" + kind);
 
 		}
-	}
-
-	/**
-	 * Recursively converts the given {@code JsonElement} to a TLC value.
-	 *
-	 * @param node the {@code JsonElement} to convert
-	 * @return the converted value
-	 */
-	private static Value getValue(JsonElement node) throws IOException {
-		if (node.isJsonArray()) {
-			return getTupleValue(node);
-		} else if (node.isJsonObject()) {
-			return getRecordValue(node);
-		} else if (node.isJsonPrimitive()) {
-			JsonPrimitive primitive = node.getAsJsonPrimitive();
-			if (primitive.isNumber()) {
-				return IntValue.gen(primitive.getAsInt());
-			} else if (primitive.isBoolean()) {
-				return new BoolValue(primitive.getAsBoolean());
-			} else if (primitive.isString()) {
-				return new StringValue(primitive.getAsString());
-			}
-		} else if (node.isJsonNull()) {
-			return null;
-		}
-		throw new IOException("Cannot convert value: unsupported JSON value " + node.toString());
 	}
 
 	/**
