@@ -116,7 +116,7 @@ class DB  extends Thread{
 		    }
 		}
 		
-		boolean isEnd() {
+		boolean hasLock() {
 			return this.lock != null;
 		}
 		
@@ -241,24 +241,25 @@ class DB  extends Thread{
 
     
 	void thread_run() {
-		
 		while (true) {
 			_Command c;
 			try {
 				c = (_Command)this.deque.take();
-				if (c == null || c.isEnd()) {
+				if (c == null || c.hasLock()) {
 					for ( Entry<String, _DB> e : this.map.entrySet()) {
 						e.getValue().close();
 					}
 					this.map.clear();
-					if (c!= null) {
+					
+					if (c != null) {
 						c.done();
 					} else {
 						break;
 					}
+				} else {
+					_DB db = this.openDB(c.path);
+					db.newValue(c.fingerprint, c.json);
 				}
-				_DB db = this.openDB(c.path);
-				db.newValue(c.fingerprint, c.json);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -286,6 +287,7 @@ class DB  extends Thread{
 		_Command c = new _Command();
 		deque.add(c);
 		c.waitDone();
+		deque.add(null);
 	}
 
 	static DB New() {
