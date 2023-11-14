@@ -76,8 +76,7 @@ import tlc2.util.FP64;
 import tlc2.overrides.*;
 import tlc2.overrides.DB._DB;
 
-
-class DB  extends Thread{
+class DB extends Thread {
 	class _Command {
 		public Lock lock = null;
 		public Condition cond = null;
@@ -85,41 +84,41 @@ class DB  extends Thread{
 		public long fingerprint;
 		public String path = null;
 		public String json = null;
-		
+
 		public _Command() {
 			Lock lock = new ReentrantLock();
-			Condition cond  = lock.newCondition();
+			Condition cond = lock.newCondition();
 			this.lock = lock;
 			this.cond = cond;
 			this.path = null;
 			this.json = null;
 			this.done = false;
 		}
-		
-		public _Command( String path,  long fingerprint, String json) {
+
+		public _Command(String path, long fingerprint, String json) {
 			this.fingerprint = fingerprint;
 			this.path = path;
 			this.json = json;
 			this.done = true;
 		}
-		
+
 		void waitDone() {
-		     try {
-		    	 this.lock.lock();
-		         while (!this.done) {
-		        	 this.cond.await();
-		         }
-		       } catch (InterruptedException e) {
+			try {
+				this.lock.lock();
+				while (!this.done) {
+					this.cond.await();
+				}
+			} catch (InterruptedException e) {
 				e.printStackTrace();
 			} finally {
-		         lock.unlock();
-		    }
+				lock.unlock();
+			}
 		}
-		
+
 		boolean hasLock() {
 			return this.lock != null;
 		}
-		
+
 		void done() {
 			try {
 				this.lock.lock();
@@ -130,42 +129,43 @@ class DB  extends Thread{
 			}
 		}
 	}
-	
+
 	class _DB {
 		private String path = null;
-		private  Connection connection = null;
-		private  PreparedStatement prepared_insert_state_stmt = null;
-		private  PreparedStatement prepared_query_state_stmt = null;
-		private  PreparedStatement prepared_put_value_stmt = null;
-		private  PreparedStatement prepared_get_value_stmt = null;
-		
+		private Connection connection = null;
+		private PreparedStatement prepared_insert_state_stmt = null;
+		private PreparedStatement prepared_query_state_stmt = null;
+		private PreparedStatement prepared_put_value_stmt = null;
+		private PreparedStatement prepared_get_value_stmt = null;
+
 		public _DB(String path) {
 			this.path = path;
 		}
-		
+
 		public void open() {
 			try {
 				if (this.path == null) {
 					return;
 				}
 				this.connection = DriverManager.getConnection("jdbc:sqlite:" + new File(this.path));
-				
+
 				Statement statement = this.connection.createStatement();
-				statement.executeUpdate("create table if not exists state (finger_print long primary key, json_string string);");
-				statement.executeUpdate("create table if not exists store (named_key string primary key, json_string string);");
-				
+				statement.executeUpdate(
+						"create table if not exists state (finger_print long primary key, json_string string);");
+				statement.executeUpdate(
+						"create table if not exists store (named_key string primary key, json_string string);");
+
 				String insert_stmt = "insert into state values(?, ?)"
 						+ "on conflict(finger_print) do update set json_string = ?;";
 				this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
-				
+
 				String query_stmt = "select json_string from state;";
 				this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
-				
+
 				String put_stmt = "insert into store values(?, ?) "
 						+ "on conflict(named_key) do update set json_string = ?;";
 				this.prepared_put_value_stmt = this.connection.prepareStatement(put_stmt);
-				
-				
+
 				String get_stmt = "select json_string from store where named_key = ?;";
 				this.prepared_get_value_stmt = this.connection.prepareStatement(get_stmt);
 
@@ -173,16 +173,18 @@ class DB  extends Thread{
 				e.printStackTrace();
 			}
 		}
-		
+
 		public void close() {
 			try {
-				this.connection.close();
+				if (this.connection != null) {
+					this.connection.close();
+				}
 			} catch (SQLException e) {
 				e.printStackTrace();
 			}
 		}
-		
-		public Vector<String> queryAll()  {
+
+		public Vector<String> queryAll() {
 			Vector<String> vec = new Vector<>();
 			try {
 				ResultSet rs = this.prepared_query_state_stmt.executeQuery();
@@ -202,7 +204,7 @@ class DB  extends Thread{
 
 			return vec;
 		}
-		
+
 		public void newValue(long finger_print, String json_string) {
 			try {
 				this.prepared_insert_state_stmt.clearParameters();
@@ -216,41 +218,41 @@ class DB  extends Thread{
 			}
 		}
 	}
-	
+
 	private final int MAX_CAPACITY = 10000;
-	
+
 	private ConcurrentHashMap<String, _DB> map = new ConcurrentHashMap<String, _DB>();
 	private LinkedBlockingDeque<_Command> deque = new LinkedBlockingDeque<_Command>(MAX_CAPACITY);
 
-	DB () {}
-	
-    public void run() {
-    	this.thread_run();
-    }
-    
-    public void addState(String path, long fingerprint, String json) {
-    	_Command c = new _Command(path, fingerprint, json);
-    	try {
+	DB() {
+	}
+
+	public void run() {
+		this.thread_run();
+	}
+
+	public void addState(String path, long fingerprint, String json) {
+		_Command c = new _Command(path, fingerprint, json);
+		try {
 			while (!this.deque.offer(c, 60, TimeUnit.SECONDS)) {
 				this.close();
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-    }
+	}
 
-    
 	void thread_run() {
 		while (true) {
 			_Command c;
 			try {
-				c = (_Command)this.deque.take();
+				c = (_Command) this.deque.take();
 				if (c == null || c.hasLock()) {
-					for ( Entry<String, _DB> e : this.map.entrySet()) {
+					for (Entry<String, _DB> e : this.map.entrySet()) {
 						e.getValue().close();
 					}
 					this.map.clear();
-					
+
 					if (c != null) {
 						c.done();
 					} else {
@@ -263,9 +265,9 @@ class DB  extends Thread{
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
-		}	
+		}
 	}
-	
+
 	_DB openDB(String path) {
 		_DB db = this.map.get(path);
 		if (db == null) {
@@ -276,43 +278,39 @@ class DB  extends Thread{
 		}
 		return db;
 	}
-	
+
 	Vector<String> queryAllState(String path) {
 		_DB db = this.openDB(path);
 		return db.queryAll();
 	}
-	
 
 	public void close() {
 		_Command c = new _Command();
 		deque.add(c);
 		c.waitDone();
-		deque.add(null);
 	}
 
 	static DB New() {
 		DB db = new DB();
 		return db;
 	}
-
 }
+
 /**
  * Module overrides for operators to read and write JSON.
  */
 public class StateDB {
-	
+
 	static DB db;
 	static {
 		db = DB.New();
 		db.start();
 	}
 
-
-
 	/**
 	 * Flush all values
 	 *
-	 * @param path  the db file path to which to write
+	 * @param path the db file path to which to write
 	 */
 	@TLAPlusOperator(identifier = "FlushAll", module = "StateDB", warn = false)
 	public synchronized static Value flushAll() throws IOException {
@@ -337,25 +335,23 @@ public class StateDB {
 		}
 		SetEnumValue set = new SetEnumValue(values.toArray(new Value[values.size()]), false);
 		set.normalize();
-		return set ;
+		return set;
 	}
 
 	/**
 	 * Store a state to database.
 	 *
-	 * @param path  state value
+	 * @param path state value
 	 */
 	@TLAPlusOperator(identifier = "SaveValue", module = "StateDB", warn = false)
 	public synchronized static BoolValue newState(final Value state, final StringValue path) throws IOException {
 		state.normalize();
 		long fp = state.fingerPrint(FP64.New());
 		String json_string = getNode(state).toString();
-		StateDB.db.addState(path.val.toString(),  fp,  json_string);
+		StateDB.db.addState(path.val.toString(), fp, json_string);
 		return BoolValue.ValTrue;
 	}
 
-	
-	
 	/**
 	 * Recursively converts the given value to a {@code JsonElement}.
 	 *
@@ -401,7 +397,7 @@ public class StateDB {
 		byte kind = 0;
 		if (value instanceof StringValue) {
 			StringValue v = ((StringValue) value);
-			jsonPrimitive =  new JsonPrimitive(v.val.toString());
+			jsonPrimitive = new JsonPrimitive(v.val.toString());
 			kind = v.getKind();
 		} else if (value instanceof ModelValue) {
 			ModelValue v = (ModelValue) value;
@@ -464,15 +460,16 @@ public class StateDB {
 	}
 
 	/**
-	 * Converts the given record value to a {@code JsonObject}, recursively converting values.
+	 * Converts the given record value to a {@code JsonObject}, recursively
+	 * converting values.
 	 *
 	 * @param value the value to convert
 	 * @return the converted {@code JsonElement}
 	 */
 	private static JsonElement getObjectNode(FcnRcdValue value) throws IOException {
 		Value tuple_value = value.toTuple();
-		if (tuple_value != null && ((TupleValue)tuple_value).size() != 0) {
-			return getArrayNode((TupleValue)tuple_value);
+		if (tuple_value != null && ((TupleValue) tuple_value).size() != 0) {
+			return getArrayNode((TupleValue) tuple_value);
 		}
 
 		final Value[] domain = value.getDomainAsValues();
@@ -481,11 +478,11 @@ public class StateDB {
 			JsonObject object = new JsonObject();
 			Value domainValue = domain[i];
 			JsonElement domainElement = getNode(domainValue);
-			object.add("domain",domainElement);
-			
+			object.add("domain", domainElement);
+
 			JsonElement valueElement = getNode(value.values[i]);
-			object.add("value",valueElement);
-			
+			object.add("value", valueElement);
+
 			if (domainValue instanceof StringValue) {
 				jsonObject.add(((StringValue) domainValue).val.toString(), object);
 			} else {
@@ -521,7 +518,7 @@ public class StateDB {
 		for (int i = 0; i < value.elems.length; i++) {
 			jsonObject.add(String.valueOf(i), getNode(value.elems[i]));
 		}
-		return jsonElementSetTypeId(jsonObject,value.getKind());
+		return jsonElementSetTypeId(jsonObject, value.getKind());
 	}
 
 	/**
@@ -607,7 +604,6 @@ public class StateDB {
 		return jsonElementSetTypeId(jsonArray, value.getKind());
 	}
 
-
 	private static Value getTypedValue(JsonElement node) throws IOException {
 		if (!node.isJsonObject()) {
 			throw new IOException("Cannot convert value: unsupported JSON value 467 " + node.toString());
@@ -618,27 +614,28 @@ public class StateDB {
 		int kind = je_kind.getAsInt();
 
 		switch (kind) {
-			case ValueConstants.RECORDVALUE:
-				return getRecordValue(je_object);
-			case ValueConstants.TUPLEVALUE:
-				return getTupleValue(je_object);
-			case ValueConstants.STRINGVALUE:
-				return new StringValue(je_object.getAsString());
-			case ValueConstants.MODELVALUE:
-				return ModelValue.make(je_object.getAsString());
-			case ValueConstants.INTVALUE:
-				return IntValue.gen(je_object.getAsInt());
-			case ValueConstants.BOOLVALUE:
-				return new BoolValue(je_object.getAsBoolean());
-			case ValueConstants.FCNRCDVALUE:
-				return getFcnRcdValue(je_object);
-			case ValueConstants.SETENUMVALUE:
-				return getSetEnumValue(je_object);
-			default:
-				throw new IOException("Unknown value kind :" + kind);
+		case ValueConstants.RECORDVALUE:
+			return getRecordValue(je_object);
+		case ValueConstants.TUPLEVALUE:
+			return getTupleValue(je_object);
+		case ValueConstants.STRINGVALUE:
+			return new StringValue(je_object.getAsString());
+		case ValueConstants.MODELVALUE:
+			return ModelValue.make(je_object.getAsString());
+		case ValueConstants.INTVALUE:
+			return IntValue.gen(je_object.getAsInt());
+		case ValueConstants.BOOLVALUE:
+			return new BoolValue(je_object.getAsBoolean());
+		case ValueConstants.FCNRCDVALUE:
+			return getFcnRcdValue(je_object);
+		case ValueConstants.SETENUMVALUE:
+			return getSetEnumValue(je_object);
+		default:
+			throw new IOException("Unknown value kind :" + kind);
 
 		}
 	}
+
 	/**
 	 * Recursively converts the given {@code JsonElement} to a TLC value.
 	 *
@@ -648,23 +645,18 @@ public class StateDB {
 	private static Value getValue(JsonElement node) throws IOException {
 		if (node.isJsonArray()) {
 			return getTupleValue(node);
-		}
-		else if (node.isJsonObject()) {
+		} else if (node.isJsonObject()) {
 			return getRecordValue(node);
-		}
-		else if (node.isJsonPrimitive()) {
+		} else if (node.isJsonPrimitive()) {
 			JsonPrimitive primitive = node.getAsJsonPrimitive();
 			if (primitive.isNumber()) {
 				return IntValue.gen(primitive.getAsInt());
-			}
-			else if (primitive.isBoolean()) {
+			} else if (primitive.isBoolean()) {
 				return new BoolValue(primitive.getAsBoolean());
-			}
-			else if (primitive.isString()) {
+			} else if (primitive.isString()) {
 				return new StringValue(primitive.getAsString());
 			}
-		}
-		else if (node.isJsonNull()) {
+		} else if (node.isJsonNull()) {
 			return null;
 		}
 		throw new IOException("Cannot convert value: unsupported JSON value " + node.toString());
@@ -685,7 +677,6 @@ public class StateDB {
 		return new TupleValue(values.toArray(new Value[values.size()]));
 	}
 
-
 	/**
 	 * Converts the given {@code JsonElement} to a FcnRcd.
 	 *
@@ -698,22 +689,21 @@ public class StateDB {
 		if (node.isJsonArray()) {
 			JsonArray array = node.getAsJsonArray();
 			if (array.size() == 0) {
-				return (FcnRcdValue)FcnRcdValue.EmptyFcn;
+				return (FcnRcdValue) FcnRcdValue.EmptyFcn;
 			}
 		}
-		
+
 		Iterator<Map.Entry<String, JsonElement>> iterator = node.getAsJsonObject().entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<String, JsonElement> entry = iterator.next();
 			JsonObject element = entry.getValue().getAsJsonObject();
 			JsonElement domain = element.get("domain");
 			JsonElement value = element.get("value");
-			
+
 			keys.add(getTypedValue(domain));
 			values.add(getTypedValue(value));
 		}
-		return new FcnRcdValue(keys.toArray(new Value[keys.size()]), values.toArray(new Value[values.size()]),
-				true);
+		return new FcnRcdValue(keys.toArray(new Value[keys.size()]), values.toArray(new Value[values.size()]), true);
 	}
 
 	/**
@@ -730,7 +720,6 @@ public class StateDB {
 		}
 		return new SetEnumValue(values.toArray(new Value[values.size()]), true);
 	}
-
 
 	/**
 	 * Converts the given {@code JsonElement} to a record.
