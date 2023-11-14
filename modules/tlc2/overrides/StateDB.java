@@ -95,7 +95,8 @@ class DB  extends Thread{
 			this.done = false;
 		}
 		
-		public _Command( String path,  long fingerprint,String json) {
+		public _Command( String path,  long fingerprint, String json) {
+			this.fingerprint = fingerprint;
 			this.path = path;
 			this.json = json;
 			this.done = true;
