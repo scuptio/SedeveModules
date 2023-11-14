@@ -43,6 +43,7 @@ import java.util.Vector;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -212,8 +213,10 @@ class DB  extends Thread{
 		}
 	}
 	
+	private final int MAX_CAPACITY = 10000;
+	
 	private ConcurrentHashMap<String, _DB> map = new ConcurrentHashMap<String, _DB>();
-	private LinkedBlockingDeque<_Command> deque = new LinkedBlockingDeque<_Command>();
+	private LinkedBlockingDeque<_Command> deque = new LinkedBlockingDeque<_Command>(MAX_CAPACITY);
 
 	DB () {}
 	
@@ -223,7 +226,13 @@ class DB  extends Thread{
     
     public void addState(String path, long fingerprint, String json) {
     	_Command c = new _Command(path, fingerprint, json);
-    	this.deque.add(c);
+    	try {
+			while (!this.deque.offer(c, 60, TimeUnit.SECONDS)) {
+				this.close();
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
     }
 
     
