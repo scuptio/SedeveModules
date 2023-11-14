@@ -175,7 +175,11 @@ class DB  extends Thread{
 		}
 		
 		public void close() {
-			
+			try {
+				this.connection.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		public Vector<String> queryAll()  {
@@ -246,18 +250,18 @@ class DB  extends Thread{
 					for ( Entry<String, _DB> e : this.map.entrySet()) {
 						e.getValue().close();
 					}
+					this.map.clear();
 					if (c!= null) {
 						c.done();
+					} else {
+						break;
 					}
-					break;
 				}
 				_DB db = this.openDB(c.path);
 				db.newValue(c.fingerprint, c.json);
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-
 		}	
 	}
 	
