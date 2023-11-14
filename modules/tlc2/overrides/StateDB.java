@@ -38,7 +38,14 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Vector;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -66,137 +73,217 @@ import tlc2.value.ValueConstants;
 import util.UniqueString;
 import tlc2.util.FP64;
 import tlc2.overrides.*;
+import tlc2.overrides.DB._DB;
 
 
- class DB {
-	private String path = null;
-	private  Connection connection = null;
-	private  PreparedStatement prepared_insert_state_stmt = null;
-	private  PreparedStatement prepared_query_state_stmt = null;
-	private  PreparedStatement prepared_put_value_stmt = null;
-	private  PreparedStatement prepared_get_value_stmt = null;
-	DB () {}
-
-	public void open(String path) {
-		try {
-			if (this.path == path) {
-				return;
-			}
-
-
+class DB  extends Thread{
+	class _Command {
+		public Lock lock = null;
+		public Condition cond = null;
+		public boolean done;
+		public long fingerprint;
+		public String path = null;
+		public String json = null;
+		
+		public _Command() {
+			Lock lock = new ReentrantLock();
+			Condition cond  = lock.newCondition();
+			this.lock = lock;
+			this.cond = cond;
+			this.path = null;
+			this.json = null;
+			this.done = false;
+		}
+		
+		public _Command( String path,  long fingerprint,String json) {
 			this.path = path;
-			this.connection = DriverManager.getConnection(String.format("jdbc:sqlite:%s", path));
-			
-			Statement statement = this.connection.createStatement();
-			statement.executeUpdate("create table if not exists state (finger_print long primary key, json_string string);");
-			statement.executeUpdate("create table if not exists store (named_key string primary key, json_string string);");
-			
-			String insert_stmt = "insert into state values(?, ?)"
-					+ "on conflict(finger_print) do update set json_string = ?;";
-			this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
-			
-			String query_stmt = "select json_string from state;";
-			this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
-			
-			String put_stmt = "insert into store values(?, ?) "
-					+ "on conflict(named_key) do update set json_string = ?;";
-			this.prepared_put_value_stmt = this.connection.prepareStatement(put_stmt);
-			
-			
-			String get_stmt = "select json_string from store where named_key = ?;";
-			this.prepared_get_value_stmt = this.connection.prepareStatement(get_stmt);
-
-		} catch (SQLException e) {
-			e.printStackTrace();
+			this.json = json;
+			this.done = true;
+		}
+		
+		void waitDone() {
+		     try {
+		    	 this.lock.lock();
+		         while (!this.done) {
+		        	 this.cond.await();
+		         }
+		       } catch (InterruptedException e) {
+				e.printStackTrace();
+			} finally {
+		         lock.unlock();
+		    }
+		}
+		
+		boolean isEnd() {
+			return this.lock != null;
+		}
+		
+		void done() {
+			try {
+				this.lock.lock();
+				this.done = true;
+				this.cond.signal();
+			} finally {
+				lock.unlock();
+			}
 		}
 	}
+	
+	class _DB {
+		private String path = null;
+		private  Connection connection = null;
+		private  PreparedStatement prepared_insert_state_stmt = null;
+		private  PreparedStatement prepared_query_state_stmt = null;
+		private  PreparedStatement prepared_put_value_stmt = null;
+		private  PreparedStatement prepared_get_value_stmt = null;
+		
+		public _DB(String path) {
+			this.path = path;
+		}
+		
+		public void open() {
+			try {
+				if (this.path == null) {
+					return;
+				}
+				System.out.println(this.path);
+				this.connection = DriverManager.getConnection("jdbc:sqlite:" + new File(this.path));
+				
+				Statement statement = this.connection.createStatement();
+				statement.executeUpdate("create table if not exists state (finger_print long primary key, json_string string);");
+				statement.executeUpdate("create table if not exists store (named_key string primary key, json_string string);");
+				
+				String insert_stmt = "insert into state values(?, ?)"
+						+ "on conflict(finger_print) do update set json_string = ?;";
+				this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
+				
+				String query_stmt = "select json_string from state;";
+				this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
+				
+				String put_stmt = "insert into store values(?, ?) "
+						+ "on conflict(named_key) do update set json_string = ?;";
+				this.prepared_put_value_stmt = this.connection.prepareStatement(put_stmt);
+				
+				
+				String get_stmt = "select json_string from store where named_key = ?;";
+				this.prepared_get_value_stmt = this.connection.prepareStatement(get_stmt);
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		
+		public void close() {
+			
+		}
+		
+		public Vector<String> queryAll()  {
+			Vector<String> vec = new Vector<>();
+			try {
+				ResultSet rs = this.prepared_query_state_stmt.executeQuery();
+				while (true) {
+					boolean ok = rs.next();
+					if (ok) {
+						String json_string = rs.getString(1);
+						vec.add(json_string);
+					} else {
+						break;
+					}
+				}
+			} catch (SQLException e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace();
+			}
+
+			return vec;
+		}
+		
+		public void newValue(long finger_print, String json_string) {
+			System.err.printf("%s %s", this.path, json_string);
+			try {
+				this.prepared_insert_state_stmt.clearParameters();
+				this.prepared_insert_state_stmt.setLong(1, finger_print);
+				this.prepared_insert_state_stmt.setString(2, json_string);
+				this.prepared_insert_state_stmt.setString(3, json_string);
+				this.prepared_insert_state_stmt.execute();
+			} catch (SQLException e) {
+				System.err.println(e.getMessage());
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	private ConcurrentHashMap<String, _DB> map = new ConcurrentHashMap<String, _DB>();
+	private LinkedBlockingDeque<_Command> deque = new LinkedBlockingDeque<_Command>();
+
+	DB () {}
+	
+    public void run() {
+    	this.thread_run();
+    }
+    
+    public void addState(String path, long fingerprint, String json) {
+    	System.out.printf("%s", json);
+    	_Command c = new _Command(path, fingerprint, json);
+    	this.deque.add(c);
+    }
+
+    
+	void thread_run() {
+		
+		while (true) {
+			_Command c;
+			try {
+				c = (_Command)this.deque.take();
+				if (c == null || c.isEnd()) {
+					for ( Entry<String, _DB> e : this.map.entrySet()) {
+						e.getValue().close();
+					}
+					if (c!= null) {
+						c.done();
+					}
+					break;
+				}
+				_DB db = this.openDB(c.path);
+				db.newValue(c.fingerprint, c.json);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+		}	
+	}
+	
+	_DB openDB(String path) {
+		_DB db = this.map.get(path);
+		if (db == null) {
+			_DB _db = new _DB(path);
+			_db.open();
+			this.map.put(path, _db);
+			db = _db;
+		}
+		return db;
+	}
+	
+	Vector<String> queryAllState(String path) {
+		_DB db = this.openDB(path);
+		return db.queryAll();
+	}
+	
 
 	public void close() {
-		try {
-			connection.close();
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
+		System.out.println("state db close");
+		_Command c = new _Command();
+		deque.add(c);
+		c.waitDone();
+		System.out.println("close done");
 	}
 
 	static DB New() {
 		DB db = new DB();
-		String env_name = "STATE_STORE";
-		Map<String, String> env = System.getenv();
-		if (env.containsKey(env_name)) {
-			String path = env.get(env_name);
-			db.open(path);
-		}
-
 		return db;
 	}
 
-	public Vector<String> get()  {
-		Vector<String> vec = new Vector<>();
-		try {
-			ResultSet rs = this.prepared_query_state_stmt.executeQuery();
-			while (true) {
-				boolean ok = rs.next();
-				if (ok) {
-					String json_string = rs.getString(1);
-					vec.add(json_string);
-				} else {
-					break;
-				}
-			}
-		} catch (SQLException e) {
-			System.err.println(e.getMessage());
-			e.printStackTrace();
-		}
-
-		return vec;
-	}
-
-	public void new_state(long finger_print, String json_string) {
-		try {
-			this.prepared_insert_state_stmt.clearParameters();
-			this.prepared_insert_state_stmt.setLong(1, finger_print);
-			this.prepared_insert_state_stmt.setString(2, json_string);
-			this.prepared_insert_state_stmt.setString(3, json_string);
-			this.prepared_insert_state_stmt.execute();
-		} catch (SQLException e) {
-			System.err.println(e.getMessage());
-			e.printStackTrace();
-		}
-	}
-	
-	public void put_value(String name, String json_string) {
-		try {
-			this.prepared_put_value_stmt.clearParameters();
-			this.prepared_put_value_stmt.setString(1, name);
-			this.prepared_put_value_stmt.setString(2, json_string);
-			this.prepared_put_value_stmt.setString(3, json_string);
-			this.prepared_put_value_stmt.execute();
-		} catch (SQLException e) {
-			System.err.println(e.getMessage());
-			e.printStackTrace();
-		}
-	}
-	
-	
-	public String get_value(String name) {
-		try {
-			this.prepared_get_value_stmt.clearParameters();
-			this.prepared_get_value_stmt.setString(1, name);
-			ResultSet rs = this.prepared_get_value_stmt.executeQuery();
-			boolean ok = rs.next();
-			if (ok) {
-				String json_string = rs.getString(1);
-				return json_string;
-			} else {
-				return null;
-			}
-		} catch (SQLException e) {
-			System.err.println(e.getMessage());
-			e.printStackTrace();
-		}
-		return null;
-	}
 }
 /**
  * Module overrides for operators to read and write JSON.
@@ -206,26 +293,18 @@ public class StateDB {
 	static DB db;
 	static {
 		db = DB.New();
+		db.start();
 	}
 
+
+
 	/**
-	 * Open storage.
+	 * Flush all values
 	 *
 	 * @param path  the db file path to which to write
 	 */
-	@TLAPlusOperator(identifier = "DBOpen", module = "StateDB", warn = false)
-	public synchronized static BoolValue dbOpen(final StringValue path) throws IOException {
-		StateDB.db.open(path.val.toString());
-		return BoolValue.ValTrue;
-	}
-
-	/**
-	 * Open storage.
-	 *
-	 * @param path  the db file path to which to write
-	 */
-	@TLAPlusOperator(identifier = "DBClose", module = "StateDB", warn = false)
-	public synchronized static BoolValue dbClose() throws IOException {
+	@TLAPlusOperator(identifier = "FlushAll", module = "StateDB", warn = false)
+	public synchronized static Value flushAll() throws IOException {
 		StateDB.db.close();
 		return BoolValue.ValTrue;
 	}
@@ -234,10 +313,9 @@ public class StateDB {
 	 * Query all states and return a set.
 	 *
 	 */
-	@TLAPlusOperator(identifier = "QueryAllStates", module = "StateDB", warn = false)
-	public synchronized static Value queryAllValues() throws IOException {
-		Vector<String> rows = StateDB.db.get();
-		
+	@TLAPlusOperator(identifier = "QueryAllValues", module = "StateDB", warn = false)
+	public synchronized static Value queryAllValues(StringValue path) throws IOException {
+		Vector<String> rows = StateDB.db.queryAllState(path.val.toString());
 		List<Value> values = new ArrayList<>();
 
 		for (int i = 0; i < rows.size(); i++) {
@@ -256,43 +334,16 @@ public class StateDB {
 	 *
 	 * @param path  state value
 	 */
-	@TLAPlusOperator(identifier = "CreateState", module = "StateDB", warn = false)
-	public synchronized static BoolValue newState(final Value state) throws IOException {
+	@TLAPlusOperator(identifier = "SaveValue", module = "StateDB", warn = false)
+	public synchronized static BoolValue newState(final Value state, final StringValue path) throws IOException {
 		state.normalize();
 		long fp = state.fingerPrint(FP64.New());
 		String json_string = getNode(state).toString();
-		StateDB.db.new_state(fp, json_string);
+		StateDB.db.addState(path.val.toString(),  fp,  json_string);
 		return BoolValue.ValTrue;
 	}
 
 	
-	/**
-	 * Read a named value from database.
-	 *
-	 * @param name
-	 */
-	@TLAPlusOperator(identifier = "LoadValue", module = "StateDB", warn = false)
-	public synchronized static Value getValue(final StringValue name) throws IOException {
-		String s = name.toString();
-		String json_string = StateDB.db.get_value(s);
-		JsonElement json_element = JsonParser.parseString(json_string);
-		Value value = getTypedValue(json_element);
-		return value;
-	}
-
-	/**
-	 * Save a named value t database.
-	 *
-	 * @param name
-	 * @param value
-	 */
-	@TLAPlusOperator(identifier = "StoreValue", module = "StateDB", warn = false)
-	public synchronized static BoolValue putValue(final StringValue name, final Value value) throws IOException {
-		String s = name.toString();
-		String json_string = getNode(value).toString();
-		StateDB.db.put_value(s, json_string);
-		return BoolValue.ValTrue;
-	}
 	
 	/**
 	 * Recursively converts the given value to a {@code JsonElement}.

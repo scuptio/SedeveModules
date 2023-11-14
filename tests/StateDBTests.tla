@@ -5,24 +5,11 @@ EXTENDS StateDB, FiniteSets, TLC, TLCExt, Integers, Sequences, SequencesExt
 ASSUME LET T == INSTANCE TLC IN T!PrintT("StateDBTests")
 
 
-TestStoreLoad ==
-    LET a == "a"
-        b == "b"
-    IN
-       /\ DBOpen("/tmp/value.db")
-       /\ StoreValue(a, a)
-       /\ StoreValue(b, b)
-       /\ a = LoadValue(a)
-       /\ b = LoadValue(b)
 
-	   
-ASSUME(TestStoreLoad)
 
 
 TestState ==
-
-       /\ DBOpen("/tmp/state.db")
-       /\ LET 
+       /\ LET 	path == "/tmp/state"
 	   			node_id == {"n1", "n2"}
 	   			value == {"v1", "v2"}
 				entry == [
@@ -37,10 +24,11 @@ TestState ==
 			       		] 
 					] : x \in  SetToAllKPermutations(entry)
 				}
-	   IN /\ \A l \in log : CreateState(l)
-	      /\ LET s == QueryAllStates
-	         IN /\ s = log
-				
+	   	 IN /\ (\A l \in log : SaveValue(l, path))
+	   /\ FlushAll
+	   /\ LET s == QueryAllValues(path)
+	         IN /\ PrintT(s)
+	
 ASSUME(TestState)
 
 ====
