@@ -146,7 +146,6 @@ class DB  extends Thread{
 				if (this.path == null) {
 					return;
 				}
-				System.out.println(this.path);
 				this.connection = DriverManager.getConnection("jdbc:sqlite:" + new File(this.path));
 				
 				Statement statement = this.connection.createStatement();
@@ -199,7 +198,6 @@ class DB  extends Thread{
 		}
 		
 		public void newValue(long finger_print, String json_string) {
-			System.err.printf("%s %s", this.path, json_string);
 			try {
 				this.prepared_insert_state_stmt.clearParameters();
 				this.prepared_insert_state_stmt.setLong(1, finger_print);
@@ -223,7 +221,6 @@ class DB  extends Thread{
     }
     
     public void addState(String path, long fingerprint, String json) {
-    	System.out.printf("%s", json);
     	_Command c = new _Command(path, fingerprint, json);
     	this.deque.add(c);
     }
@@ -272,11 +269,9 @@ class DB  extends Thread{
 	
 
 	public void close() {
-		System.out.println("state db close");
 		_Command c = new _Command();
 		deque.add(c);
 		c.waitDone();
-		System.out.println("close done");
 	}
 
 	static DB New() {
