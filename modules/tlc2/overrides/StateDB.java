@@ -214,7 +214,7 @@ class DB extends Thread {
 		_Command c = new _Command(path,json);
 		try {
 			while (!this.deque.offer(c, 60, TimeUnit.SECONDS)) {
-				this.close();
+				this.flushAll();
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
@@ -263,14 +263,14 @@ class DB extends Thread {
 		return db.queryAll();
 	}
 
-	public void close() {
+	public void flushAll() {
 		_Command c = new _Command();
 		deque.add(c);
 		c.waitDone();
 	}
 
 	static DB New() {
-		DB db = new DB();
+		DB db = new DB();		
 		return db;
 	}
 }
@@ -283,6 +283,13 @@ public class StateDB {
 	static DB db;
 	static {
 		db = DB.New();
+
+		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+		    public void run() {
+		        StateDB.db.flushAll();
+		    }
+		}));
+
 		db.start();
 	}
 
@@ -293,7 +300,7 @@ public class StateDB {
 	 */
 	@TLAPlusOperator(identifier = "FlushAll", module = "StateDB", warn = false)
 	public synchronized static Value flushAll() throws IOException {
-		StateDB.db.close();
+		StateDB.db.flushAll();
 		return BoolValue.ValTrue;
 	}
 
