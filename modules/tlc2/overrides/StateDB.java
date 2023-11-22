@@ -63,6 +63,7 @@ import tlc2.value.impl.SetEnumValue;
 import tlc2.value.impl.SetOfFcnsValue;
 import tlc2.value.impl.SetOfRcdsValue;
 import tlc2.value.impl.SetOfTuplesValue;
+import tlc2.value.impl.SetPredValue;
 import tlc2.value.impl.StringValue;
 import tlc2.value.impl.SubsetValue;
 import tlc2.value.impl.TupleValue;
@@ -373,7 +374,9 @@ public class StateDB {
 			return getArrayNode((SetEnumValue) ((SubsetValue) value).toSetEnum());
 		} else if (value instanceof IntervalValue) {
 			return getArrayNode((SetEnumValue) ((IntervalValue) value).toSetEnum());
-		} else {
+		} else if (value instanceof SetPredValue){
+			return getArrayNode((SetEnumValue)((SetPredValue)value).toSetEnum());
+		}else {
 			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
 		}
 	}
