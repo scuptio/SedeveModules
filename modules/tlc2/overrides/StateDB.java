@@ -71,58 +71,61 @@ import tlc2.value.impl.Value;
 import tlc2.value.ValueConstants;
 import util.UniqueString;
 
-class DB extends Thread {
-	class _Command {
-		public Lock lock = null;
-		public Condition cond = null;
-		public boolean done;
-		public String path = null;
-		public String json = null;
+class _Command {
+	
+}
 
-		public _Command() {
-			Lock lock = new ReentrantLock();
-			Condition cond = lock.newCondition();
-			this.lock = lock;
-			this.cond = cond;
-			this.path = null;
-			this.json = null;
-			this.done = false;
-		}
+class _ValueRecord extends _Command {
 
-		public _Command(String path,  String json) {
-			this.path = path;
-			this.json = json;
-			this.done = true;
-		}
+	public String path = null;
+	public String value = null;
+	
+	public _ValueRecord(String path, final String value) {
+		this.path = path;
+		this.value = value;
+	}
+}
 
-		void waitDone() {
-			try {
-				this.lock.lock();
-				while (!this.done) {
-					this.cond.await();
-				}
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			} finally {
-				lock.unlock();
+class _Control extends _Command {
+	public Lock lock = null;
+	public Condition cond = null;
+	public boolean done;
+	
+	public _Control() {
+		Lock lock = new ReentrantLock();
+		Condition cond = lock.newCondition();
+		this.lock = lock;
+		this.cond = cond;
+		this.done = false;
+	}
+	
+	void await() {
+		try {
+			this.lock.lock();
+			while (!this.done) {
+				this.cond.await();
 			}
-		}
-
-		boolean hasLock() {
-			return this.lock != null;
-		}
-
-		void done() {
-			try {
-				this.lock.lock();
-				this.done = true;
-				this.cond.signal();
-			} finally {
-				lock.unlock();
-			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		} finally {
+			lock.unlock();
 		}
 	}
+	
+	public void done() {
+		try {
+			this.lock.lock();
+			this.done = true;
+			this.cond.signal();
+		} finally {
+			lock.unlock();
+		}
+	}
+}
 
+
+
+class DB extends Thread {
 	class _DB {
 		private String path = null;
 		private Connection connection = null;
@@ -143,13 +146,11 @@ class DB extends Thread {
 
 				Statement statement = this.connection.createStatement();
 				statement.executeUpdate(
-						"create table if not exists state (json_string string primary key);");
-
-				String insert_stmt = "insert into state values(?)"
-						+ "on conflict(json_string) do nothing;";
+						"create table if not exists state (json_string text);");
+				String insert_stmt = "insert into state values(?)";
 				this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
 
-				String query_stmt = "select json_string from state;";
+				String query_stmt = "select json_string from state order by json_string;";
 				this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -199,7 +200,8 @@ class DB extends Thread {
 		}
 	}
 
-	private final int MAX_CAPACITY = 10000;
+	private final int MAX_CAPACITY = 1000000;
+	
 
 	private ConcurrentHashMap<String, _DB> map = new ConcurrentHashMap<String, _DB>();
 	private LinkedBlockingDeque<_Command> deque = new LinkedBlockingDeque<_Command>(MAX_CAPACITY);
@@ -210,9 +212,10 @@ class DB extends Thread {
 	public void run() {
 		this.thread_run();
 	}
-
-	public void addState(String path, String json) {
-		_Command c = new _Command(path,json);
+	
+	
+	public void addState(String path, String value) {
+		_Command c = new _ValueRecord(path, value);
 		try {
 			while (!this.deque.offer(c, 60, TimeUnit.SECONDS)) {
 				this.flushAll();
@@ -221,29 +224,43 @@ class DB extends Thread {
 			e.printStackTrace();
 		}
 	}
+	
+	public void flushAll() {
+		_Control c = new _Control();
+		deque.add(c);
+		c.await();
+	}
+	
 
+	
+	void closeAll() {
+		for (Entry<String, _DB> e : this.map.entrySet()) {
+			e.getValue().close();
+		}
+		this.map.clear();
+	}
+	
 	void thread_run() {
 		while (true) {
-			_Command c;
 			try {
-				c = (_Command) this.deque.take();
-				if (c == null || c.hasLock()) {
-					for (Entry<String, _DB> e : this.map.entrySet()) {
-						e.getValue().close();
-					}
-					this.map.clear();
-
-					if (c != null) {
-						c.done();
-					} else {
-						break;
-					}
-				} else {
-					_DB db = this.openDB(c.path);
-					db.newValue(c.json);
+				_Command c = (_Command)this.deque.take();
+				
+				if (c == null) {
+					this.closeAll();
+					return;
+				} else if (c instanceof _Control) {
+					this.closeAll();
+					_Control ctrl = (_Control)c;
+					ctrl.done();
+				} else if (c instanceof _ValueRecord) {
+					_ValueRecord v = (_ValueRecord)c;
+					_DB db = this.openDB(v.path);
+					db.newValue(v.value);
 				}
+				
 			} catch (InterruptedException e) {
 				e.printStackTrace();
+				return;
 			}
 		}
 	}
@@ -264,11 +281,7 @@ class DB extends Thread {
 		return db.queryAll();
 	}
 
-	public void flushAll() {
-		_Command c = new _Command();
-		deque.add(c);
-		c.waitDone();
-	}
+
 
 	static DB New() {
 		DB db = new DB();		
@@ -287,7 +300,7 @@ public class StateDB {
 
 		Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
 		    public void run() {
-		        StateDB.db.flushAll();
+		    	db.flushAll();
 		    }
 		}));
 
@@ -333,12 +346,19 @@ public class StateDB {
 	@TLAPlusOperator(identifier = "SaveValue", module = "StateDB", warn = false)
 	public synchronized static BoolValue newState(final Value state, final StringValue path) throws IOException {
 		state.normalize();
-
-		String json_string = getNode(state).toString();
-		StateDB.db.addState(path.val.toString(), json_string);
+		String json = toJsonString(state);
+		StateDB.db.addState(path.val.toString(), json);
 		return BoolValue.ValTrue;
 	}
 
+	public static String toJsonString(Value value) {
+		try {
+			return getNode(value).toString();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return "";
+		}
+	}
 	/**
 	 * Recursively converts the given value to a {@code JsonElement}.
 	 *
