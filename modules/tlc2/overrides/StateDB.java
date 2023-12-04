@@ -59,6 +59,7 @@ import tlc2.value.impl.IntValue;
 import tlc2.value.impl.IntervalValue;
 import tlc2.value.impl.ModelValue;
 import tlc2.value.impl.RecordValue;
+import tlc2.value.impl.SetCupValue;
 import tlc2.value.impl.SetEnumValue;
 import tlc2.value.impl.SetOfFcnsValue;
 import tlc2.value.impl.SetOfRcdsValue;
@@ -217,7 +218,7 @@ class DB extends Thread {
 	public void addState(String path, String value) {
 		_Command c = new _ValueRecord(path, value);
 		try {
-			while (!this.deque.offer(c, 60, TimeUnit.SECONDS)) {
+			while (!this.deque.offer(c, 1, TimeUnit.SECONDS)) {
 				this.flushAll();
 			}
 		} catch (InterruptedException e) {
@@ -396,7 +397,10 @@ public class StateDB {
 			return getArrayNode((SetEnumValue) ((IntervalValue) value).toSetEnum());
 		} else if (value instanceof SetPredValue){
 			return getArrayNode((SetEnumValue)((SetPredValue)value).toSetEnum());
-		}else {
+		}else if (value instanceof SetCupValue) {
+			return getArrayNode((SetEnumValue)((SetCupValue)value).toSetEnum());
+		}
+		else{
 			throw new IOException("Cannot convert value: unsupported value type " + value.getClass().getName());
 		}
 	}
