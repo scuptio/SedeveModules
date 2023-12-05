@@ -228,7 +228,13 @@ class DB extends Thread {
 	
 	public void flushAll() {
 		_Control c = new _Control();
-		deque.add(c);
+		try {
+			while (!this.deque.offer(c, 1, TimeUnit.SECONDS)) {
+				
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 		c.await();
 	}
 	
