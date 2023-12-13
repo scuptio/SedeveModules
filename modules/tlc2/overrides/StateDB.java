@@ -144,9 +144,9 @@ class DB extends Thread {
 					return;
 				}
 				this.stmt_cnt = 0;
-				this.connection.setAutoCommit(false);
-				this.connection = DriverManager.getConnection("jdbc:sqlite:" + new File(this.path));
 
+				this.connection = DriverManager.getConnection("jdbc:sqlite:" + new File(this.path));
+				this.connection.setAutoCommit(false);
 				Statement statement = this.connection.createStatement();
 				statement.executeUpdate(
 						"create table if not exists state (json_string text);");
