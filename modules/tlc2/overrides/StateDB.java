@@ -132,7 +132,7 @@ class DB extends Thread {
 		private Connection connection = null;
 		private PreparedStatement prepared_insert_state_stmt = null;
 		private PreparedStatement prepared_query_state_stmt = null;
-
+		private int stmt_cnt = 0;
 
 		public _DB(String path) {
 			this.path = path;
@@ -143,6 +143,8 @@ class DB extends Thread {
 				if (this.path == null) {
 					return;
 				}
+				this.stmt_cnt = 0;
+				this.connection.setAutoCommit(false);
 				this.connection = DriverManager.getConnection("jdbc:sqlite:" + new File(this.path));
 
 				Statement statement = this.connection.createStatement();
@@ -161,6 +163,7 @@ class DB extends Thread {
 		public void close() {
 			try {
 				if (this.connection != null) {
+					this.commit();
 					this.connection.close();
 				}
 			} catch (SQLException e) {
@@ -194,16 +197,27 @@ class DB extends Thread {
 				this.prepared_insert_state_stmt.clearParameters();
 				this.prepared_insert_state_stmt.setString(1, json_string);
 				this.prepared_insert_state_stmt.execute();
+				this.stmt_cnt += 1;
+				if (this.stmt_cnt >= MAX_STMT_PER_TRANS) {
+					this.commit();
+				}
 			} catch (SQLException e) {
 				System.err.println(e.getMessage());
 				e.printStackTrace();
 			}
 		}
+		
+		public void commit() throws SQLException {
+			if (this.connection != null && this.stmt_cnt != 0) {
+				this.stmt_cnt = 0;
+				this.connection.commit();
+			}
+		}
 	}
 
 	private final int MAX_CAPACITY = 1000000;
+	private final int MAX_STMT_PER_TRANS = 1000;
 	
-
 	private ConcurrentHashMap<String, _DB> map = new ConcurrentHashMap<String, _DB>();
 	private LinkedBlockingDeque<_Command> deque = new LinkedBlockingDeque<_Command>(MAX_CAPACITY);
 
@@ -252,21 +266,31 @@ class DB extends Thread {
 	void thread_run() {
 		while (true) {
 			try {
-				_Command c = (_Command)this.deque.take();
-				
-				if (c == null) {
-					this.closeAll();
-					return;
-				} else if (c instanceof _Control) {
-					this.closeAll();
-					_Control ctrl = (_Control)c;
-					ctrl.done();
-				} else if (c instanceof _ValueRecord) {
-					_ValueRecord v = (_ValueRecord)c;
-					_DB db = this.openDB(v.path);
-					db.newValue(v.value);
+				Vector<_Command> vec = new Vector<_Command>(MAX_STMT_PER_TRANS);
+				int i = 0;
+				while (i < MAX_STMT_PER_TRANS) {
+					_Command c = (_Command)this.deque.take();
+					vec.add(c);
+					if (c == null || c instanceof _Control) {
+						break;
+					}
+					i ++;
 				}
-				
+				for (int _i = 0; _i < vec.size(); _i++) {
+					_Command c = vec.get(_i);
+					if (c == null) {
+						this.closeAll();
+						return;
+					} else if (c instanceof _Control) {
+						this.closeAll();
+						_Control ctrl = (_Control)c;
+						ctrl.done();
+					} else if (c instanceof _ValueRecord) {
+						_ValueRecord v = (_ValueRecord)c;
+						_DB db = this.openDB(v.path);
+						db.newValue(v.value);
+					}
+				}	
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 				return;
@@ -289,8 +313,6 @@ class DB extends Thread {
 		_DB db = this.openDB(path);
 		return db.queryAll();
 	}
-
-
 
 	static DB New() {
 		DB db = new DB();		
