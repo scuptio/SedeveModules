@@ -215,8 +215,8 @@ class DB extends Thread {
 		}
 	}
 
-	private final int MAX_CAPACITY = 1000000;
-	private final int MAX_STMT_PER_TRANS = 1000000;
+	private final int MAX_CAPACITY = 10000;
+	private final int MAX_STMT_PER_TRANS = 10000;
 	
 	private ConcurrentHashMap<String, _DB> map = new ConcurrentHashMap<String, _DB>();
 	private LinkedBlockingDeque<_Command> deque = new LinkedBlockingDeque<_Command>(MAX_CAPACITY);
