@@ -27,7 +27,7 @@ The Modules
 |               <a href="https://github.com/tlaplus/CommunityModules/blob/master/modules/Combinatorics.tla">Combinatorics.tla</a>               | (n choose k), factorial, .... | [&#10004;](https://github.com/tlaplus/CommunityModules/blob/master/modules/tlc2/overrides/Combinatorics.java)        | [@lemmy](https://github.com/lemmy) |
 |                     <a href="https://github.com/tlaplus/CommunityModules/blob/master/modules/BagsExt.tla">BagsExt.tla</a>                     | BagAdd, BagRemove, FoldBag, ... |                                                                                                                      | [@muenchnerkindl](https://github.com/muenchnerkindl) | 
 |              <a href="https://github.com/scuptio/TLAPlusCommunityModules/blob/master/modules/StateDB.tla">StateDB.tla</a>               | Store/Load a value to/from a given database. | [&#10004;](https://github.com/scuptio/TLAPlusCommunityModules/blob/master/modules/tlc2/overrides/StateDB.java)    | [@ybbh](https://github.com/ybbh) | 
-|                    <a href="https://github.com/scuptio/TLAPlusCommunityModules/blob/master/modules/UUID.tla">UUID.tla</a>                     | Generate a random UUID with its string representation. | [&#10004;](https://github.com/scuptio/TLAPlusCommunityModules/blob/master/modules/tlc2/overrides/GenUUID.java)       | [@ybbh](https://github.com/ybbh) | 
+|                    <a href="https://github.com/scuptio/TLAPlusCommunityModules/blob/master/modules/GenID.tla">GenID.tla</a>                     | Generate a random UUID with its string representation. | [&#10004;](https://github.com/scuptio/TLAPlusCommunityModules/blob/master/modules/tlc2/overrides/GenUUID.java)       | [@ybbh](https://github.com/ybbh) | 
 
 
 

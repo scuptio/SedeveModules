@@ -21,5 +21,5 @@ EXTENDS SequencesExtTests,
         VectorClocksTests,
 		GraphVizTests,
         StateDBTests,
-        UUIDTests
+        GenIDTests
 ===========================================
