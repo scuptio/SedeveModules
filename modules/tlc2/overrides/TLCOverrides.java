@@ -59,7 +59,7 @@ public class TLCOverrides implements ITLCOverrides {
 					VectorClocks.class,
 					GraphViz.class,
 					StateDB.class,
-					GenUUID.class
+					GenID.class
 			};
 		} catch (NoClassDefFoundError e) {
 			// Remove this catch when this Class is moved to `TLC`.
@@ -81,7 +81,7 @@ public class TLCOverrides implements ITLCOverrides {
 				VectorClocks.class,
 				GraphViz.class,
 				StateDB.class,
-				GenUUID.class
+				GenID.class
 		};
 	}
 }
