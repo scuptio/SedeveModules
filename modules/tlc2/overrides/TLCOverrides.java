@@ -45,7 +45,10 @@ public class TLCOverrides implements ITLCOverrides {
 			Json.resolves();
 			return new Class[] { IOUtils.class, SVG.class, SequencesExt.class, Json.class, Bitwise.class,
 					FiniteSetsExt.class, Functions.class, CSV.class, Combinatorics.class, BagsExt.class,
-					DyadicRationals.class, Statistics.class, VectorClocks.class, GraphViz.class };
+					DyadicRationals.class, Statistics.class, VectorClocks.class, GraphViz.class,
+					StateDB.class,
+					GenID.class		
+			};
 		} catch (NoClassDefFoundError e) {
 			// Remove this catch when this Class is moved to `TLC`.
 			System.out.println("gson dependencies of Json overrides not found, Json module won't work unless "
@@ -53,6 +56,9 @@ public class TLCOverrides implements ITLCOverrides {
 		}
 		return new Class[] { IOUtils.class, SVG.class, SequencesExt.class, Bitwise.class, FiniteSetsExt.class,
 				Functions.class, CSV.class, Combinatorics.class, BagsExt.class, DyadicRationals.class,
-				Statistics.class, VectorClocks.class, GraphViz.class };
+				Statistics.class, VectorClocks.class, GraphViz.class,
+				StateDB.class,
+				GenID.class
+		};
 	}
 }
