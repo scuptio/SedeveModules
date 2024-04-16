@@ -1,6 +1,7 @@
 package tlc2.overrides;
 /*******************************************************************************
  * Copyright (c) 2019 Microsoft Research. All rights reserved. 
+ * Copyright (c) 2023, Oracle and/or its affiliates.
  *
  * The MIT License (MIT)
  * 
@@ -25,6 +26,8 @@ package tlc2.overrides;
  *   Markus Alexander Kuppe - initial API and implementation
  ******************************************************************************/
 
+import java.util.ArrayList;
+
 import org.apache.commons.lang3.StringUtils;
 
 import tla2sany.semantic.ExprOrOpArgNode;
@@ -38,7 +41,6 @@ import tlc2.util.Context;
 import tlc2.value.IBoolValue;
 import tlc2.value.IValue;
 import tlc2.value.Values;
-import tlc2.value.impl.Applicable;
 import tlc2.value.impl.BoolValue;
 import tlc2.value.impl.FcnRcdValue;
 import tlc2.value.impl.IntValue;
@@ -273,7 +275,7 @@ public final class SequencesExt {
 		final Value[] elems = tv.elems;
 		for (int i = 0; i < elems.length; i++) {
 			args[1] = elems[i];
-			args[0] = op.apply(args, EvalControl.Clear);
+			args[0] = op.eval(args, EvalControl.Clear);
 		}
 
 		return args[0];
@@ -297,7 +299,45 @@ public final class SequencesExt {
 		final Value[] elems = tv.elems;
 		for (int i = elems.length - 1; i >= 0; i--) {
 			args[0] = elems[i];
-			args[1] = op.apply(args, EvalControl.Clear);
+			args[1] = op.eval(args, EvalControl.Clear);
+		}
+
+		return args[1];
+	}
+
+	@TLAPlusOperator(identifier = "FoldLeftDomain", module = "SequencesExt", warn = false)
+	public static Value foldLeftDomain(final OpValue op, final Value base, final Value val) {
+		final TupleValue tv = (TupleValue) val.toTuple();
+		if (tv == null) {
+			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
+					new String[] { "third", "FoldLeftDomain", "sequence", Values.ppr(val.toString()) });
+		}
+
+		final Value[] args = new Value[2];
+		args[0] = base;
+
+		for (int i = 0; i < tv.size(); i++) {
+			args[1] = IntValue.gen(i+1);
+			args[0] = op.eval(args, EvalControl.Clear);
+		}
+
+		return args[0];
+	}
+
+	@TLAPlusOperator(identifier = "FoldRightDomain", module = "SequencesExt", warn = false)
+	public static Value foldRightDomain(final OpValue op, final Value val, final Value base) {
+		final TupleValue tv = (TupleValue) val.toTuple();
+		if (tv == null) {
+			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
+					new String[] { "second", "FoldRightDomain", "sequence", Values.ppr(val.toString()) });
+		}
+
+		final Value[] args = new Value[2];
+		args[1] = base;
+
+		for (int i = tv.size() - 1; i >= 0; i--) {
+			args[0] = IntValue.gen(i+1);
+			args[1] = op.eval(args, EvalControl.Clear);
 		}
 
 		return args[1];
@@ -379,25 +419,20 @@ public final class SequencesExt {
 	}
 
 	@TLAPlusOperator(identifier = "SelectInSeq", module = "SequencesExt", warn = false)
-	public static Value selectInSeq(final Value s, final Value test) {
+	public static Value selectInSeq(final Value s, final OpValue test) {
 		final TupleValue seq = (TupleValue) s.toTuple();
 		if (seq == null) {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
 					new String[] { "first", "SelectInSeq", "sequence", Values.ppr(s.toString()) });
 		}
-		if (!(test instanceof Applicable)) {
-			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
-					new String[] { "third", "SelectInSeq", "function", Values.ppr(test.toString()) });
-		}
 		final int len = seq.size();
-		final Applicable ftest = (Applicable) test;
 		final Value[] args = new Value[1];
 		for (int i = 0; i < len; i++) {
 			args[0] = seq.elems[i];
-			final Value val = ftest.apply(args, EvalControl.Clear);
+			final Value val = test.eval(args, EvalControl.Clear);
 			if (!(val instanceof IBoolValue)) {
 				throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR, new String[] { "third", "SelectInSeq",
-						"boolean-valued function", Values.ppr(test.toString()) });
+						"boolean-valued operator", Values.ppr(test.toString()) });
 			}
 			if (((BoolValue) val).val) {
 				return IntValue.gen(i + 1);
@@ -407,7 +442,7 @@ public final class SequencesExt {
 	}
 
 	@TLAPlusOperator(identifier = "SelectInSubSeq", module = "SequencesExt", warn = false)
-	public static Value SelectInSubSeq(final Value s, final Value f, final Value t, final Value test) {
+	public static Value SelectInSubSeq(final Value s, final Value f, final Value t, final OpValue test) {
 		final TupleValue seq = (TupleValue) s.toTuple();
 		if (seq == null) {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
@@ -420,10 +455,6 @@ public final class SequencesExt {
 		if (!(t instanceof IntValue)) {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
 					new String[] { "third", "SelectInSubSeq", "natural", Values.ppr(t.toString()) });
-		}
-		if (!(test instanceof Applicable)) {
-			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
-					new String[] { "fourth", "SelectInSubSeq", "function", Values.ppr(test.toString()) });
 		}
 
 		int from = ((IntValue) f).val;
@@ -440,15 +471,14 @@ public final class SequencesExt {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_NOT_IN_DOMAIN,
 					new String[] { "third", "SelectInSubSeq", "first", Values.ppr(s.toString()), Values.ppr(t.toString()) });
 		}
-		
-		final Applicable ftest = (Applicable) test;
+
 		final Value[] args = new Value[1];
 		for (; from <= to; from++) {
 			args[0] = seq.elems[from - 1];
-			final Value val = ftest.apply(args, EvalControl.Clear);
+			final Value val = test.eval(args, EvalControl.Clear);
 			if (!(val instanceof IBoolValue)) {
 				throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR, new String[] { "fourth", "SelectInSubSeq",
-						"boolean-valued function", Values.ppr(test.toString()) });
+						"boolean-valued operator", Values.ppr(test.toString()) });
 			}
 			if (((BoolValue) val).val) {
 				return IntValue.gen(from);
@@ -458,22 +488,17 @@ public final class SequencesExt {
 	}
 	
 	@TLAPlusOperator(identifier = "SelectLastInSeq", module = "SequencesExt", warn = false)
-	public static Value selectLastInSeq(final Value s, final Value test) {
+	public static Value selectLastInSeq(final Value s, final OpValue test) {
 		final TupleValue seq = (TupleValue) s.toTuple();
 		if (seq == null) {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
 					new String[] { "first", "SelectLastInSeq", "sequence", Values.ppr(s.toString()) });
 		}
-		if (!(test instanceof Applicable)) {
-			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
-					new String[] { "third", "SelectLastInSeq", "function", Values.ppr(test.toString()) });
-		}
 		int i = seq.size() - 1;
-		final Applicable ftest = (Applicable) test;
 		final Value[] args = new Value[1];
 		for (; i >= 0; i--) {
 			args[0] = seq.elems[i];
-			final Value val = ftest.apply(args, EvalControl.Clear);
+			final Value val = test.eval(args, EvalControl.Clear);
 			if (!(val instanceof IBoolValue)) {
 				throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR, new String[] { "third", "SelectLastInSeq",
 						"boolean-valued function", Values.ppr(test.toString()) });
@@ -486,7 +511,7 @@ public final class SequencesExt {
 	}
 
 	@TLAPlusOperator(identifier = "SelectLastInSubSeq", module = "SequencesExt", warn = false)
-	public static Value SelectLastInSubSeq(final Value s, final Value f, final Value t, final Value test) {
+	public static Value SelectLastInSubSeq(final Value s, final Value f, final Value t, final OpValue test) {
 		final TupleValue seq = (TupleValue) s.toTuple();
 		if (seq == null) {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
@@ -499,10 +524,6 @@ public final class SequencesExt {
 		if (!(t instanceof IntValue)) {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
 					new String[] { "third", "SelectLastInSubSeq", "natural", Values.ppr(t.toString()) });
-		}
-		if (!(test instanceof Applicable)) {
-			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
-					new String[] { "fourth", "SelectLastInSubSeq", "function", Values.ppr(test.toString()) });
 		}
 
 		final int from = ((IntValue) f).val;
@@ -519,12 +540,11 @@ public final class SequencesExt {
 			throw new EvalException(EC.TLC_MODULE_ARGUMENT_NOT_IN_DOMAIN,
 					new String[] { "third", "SelectLastInSubSeq", "first", Values.ppr(s.toString()), Values.ppr(t.toString()) });
 		}
-		
-		final Applicable ftest = (Applicable) test;
+
 		final Value[] args = new Value[1];
 		for (; to >= from; to--) {
 			args[0] = seq.elems[to - 1];
-			final Value val = ftest.apply(args, EvalControl.Clear);
+			final Value val = test.eval(args, EvalControl.Clear);
 			if (!(val instanceof IBoolValue)) {
 				throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR, new String[] { "fourth", "SelectLastInSubSeq",
 						"boolean-valued function", Values.ppr(test.toString()) });
@@ -534,5 +554,122 @@ public final class SequencesExt {
 			}
 		}
 		return IntValue.ValZero;
+	}
+	
+	@TLAPlusOperator(identifier = "RemoveFirst", module = "SequencesExt", warn = false)
+	public static Value removeFirst(final Value s, final Value e) {
+		final TupleValue seq = (TupleValue) s.toTuple();
+		if (seq == null) {
+			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
+					new String[] { "first", "RemoveFirst", "sequence", Values.ppr(s.toString()) });
+		}
+
+		final ArrayList<Value> val = new ArrayList<>(seq.elems.length);
+		
+		boolean found = false;
+		for (int i = 0; i < seq.elems.length; i++) {
+			if (!found && seq.elems[i].equals(e)) {
+				found = true;
+			} else {
+				val.add(seq.elems[i]);
+			}
+		}
+		
+		return new TupleValue(val.toArray(Value[]::new));
+	}
+	
+	@TLAPlusOperator(identifier = "RemoveFirstMatch", module = "SequencesExt", warn = false)
+	public static Value removeFirstMatch(final Value s, final OpValue test) {
+		final TupleValue seq = (TupleValue) s.toTuple();
+		if (seq == null) {
+			throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR,
+					new String[] { "first", "RemoveFirstMatch", "sequence", Values.ppr(s.toString()) });
+		}
+		final Value[] args = new Value[1];
+
+		final ArrayList<Value> val = new ArrayList<>(seq.elems.length);
+		
+		boolean found = false;
+		for (int i = 0; i < seq.elems.length; i++) {
+			if (!found) {
+				args[0] = seq.elems[i];
+				final Value bval = test.eval(args, EvalControl.Clear);
+				if (!(bval instanceof IBoolValue)) {
+					throw new EvalException(EC.TLC_MODULE_ARGUMENT_ERROR, new String[] { "second", "RemoveFirstMatch",
+							"boolean-valued function", Values.ppr(test.toString()) });
+				}
+				if (((BoolValue) bval).val) {
+					found = true;
+					continue;
+				}
+			}
+			val.add(seq.elems[i]);
+		}
+		
+		return new TupleValue(val.toArray(Value[]::new));
+	}
+
+	/*
+	   Suffixes(s) ==
+		  (**************************************************************************)
+		  (* The set of suffixes of the sequence s, including the empty sequence.   *)
+		  (**************************************************************************)
+		  { SubSeq(s, l, Len(s)) : l \in 1..Len(s) } \cup {<<>>}
+	 */
+	@TLAPlusOperator(identifier = "Suffixes", module = "SequencesExt", warn = false)
+	public static Value Suffixes(final Value s) {
+		final TupleValue seq = (TupleValue) s.toTuple();
+		if (seq == null) {
+			throw new EvalException(EC.TLC_MODULE_ONE_ARGUMENT_ERROR,
+					new String[] { "Suffixes", "sequence", Values.ppr(s.toString()) });
+		}
+		
+		final Value[] vals = new Value[seq.elems.length + 1];
+		
+		// \cup {<<>>} 
+		vals[0] = TupleValue.EmptyTuple;
+		
+		// Add the elements in reverse order to implicitly normalize the SetEnumValue.
+		for (int i = seq.elems.length - 1; i >= 0; i--) {
+			final Value[] suffix = new Value[seq.elems.length - i];
+			System.arraycopy(seq.elems, i, suffix, 0, seq.elems.length - i);
+			
+			vals[seq.elems.length - i] = new TupleValue(suffix);
+		}
+		
+		// Decided against calling "normalize" as a safeguard, even though "vals" will
+		// be normalized. This is because "normalize," albeit performing a single pass
+		// over "vals" for a normalized input, still compares elements, which can be
+		// expensive: return new SetEnumValue(vals, false).normalize();
+		return new SetEnumValue(vals, true);
+	}
+
+	/*
+	 * AllSubSeqs(s) ==
+	 *    { FoldFunction(Snoc, <<>>, [ i \in D |-> s[i] ]) : D \in SUBSET DOMAIN s }
+	 */
+	@TLAPlusOperator(identifier = "AllSubSeqs", module = "SequencesExt", warn = false)
+	public static Value AllSubSeqs(final Value s) {
+		final TupleValue seq = (TupleValue) s.toTuple();
+		if (seq == null) {
+			throw new EvalException(EC.TLC_MODULE_ONE_ARGUMENT_ERROR,
+					new String[] { "AllSubSeqs", "sequence", Values.ppr(s.toString()) });
+		}
+
+		final int n = seq.elems.length;
+		final Value[] vals = new Value[(int) Math.pow(2, n)];
+
+		for (int i = 0; i < (1 << n); i++) {
+			int k = 0;
+			final Value[] subSeq = new Value[Long.bitCount(i)];
+			for (int j = 0; j < n; j++) {
+				if ((i & (1 << j)) != 0) {
+					subSeq[k++] = seq.elems[j];
+				}
+			}
+			vals[i] = new TupleValue(subSeq);
+		}
+
+		return new SetEnumValue(vals, false);
 	}
 }

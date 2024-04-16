@@ -161,9 +161,34 @@ RoundTrip ==
        /\ output = JsonDeserialize("build/json/test.json")
 ASSUME(RoundTrip)
 
+RoundTrip2 ==
+    LET output == [a |-> 3, b |-> [c |-> <<4, 5, 6>>]]
+    IN
+       /\ JsonSerialize("target/json/test.json", output)
+       /\ output = JsonDeserialize("target/json/test.json")
+ASSUME(RoundTrip2)
+
 \* Deserialize existing ndjson with trailing white spaces and (empty) newlines.
 
 ASSUME LET input == <<[a |-> 3], <<<<1, 2>>, "look">>, << <<[b |-> [c |-> <<4, 5, 6>>]]>> >> >>
        IN  input = ndJsonDeserialize("tests/JsonTests.ndjson")
+
+-----
+
+ASSUME AssertError(
+           "The second argument of JsonSerialize should be a sequence or record, but instead it is:\n{1, 2, 3}",
+           JsonSerialize("target/json/test.json", {1,2,3} ))
+
+ASSUME AssertError(
+           "The second argument of ndJsonSerialize should be a sequence, but instead it is:\n[a |-> 1, b |-> TRUE]",
+           ndJsonSerialize("target/json/test.json", [a |-> 1, b |-> TRUE] ))
+
+ASSUME AssertError(
+           "The second argument of JsonSerialize should be a sequence or record, but instead it is:\n42",
+           JsonSerialize("target/json/test.json", 42 ))
+
+ASSUME AssertError(
+           "The second argument of ndJsonSerialize should be a sequence, but instead it is:\n42",
+           ndJsonSerialize("target/json/test.json", 42 ))
 
 =============================================================================

@@ -227,6 +227,30 @@ ASSUME \A seq \in BoundedSeq(1..5, 5) :
 
 -----------------------------------------------------------------------------
 
+ASSUME AllSubSeqs(<<>>) = {<<>>}
+ASSUME AllSubSeqs(<<1>>) = {<<>>, <<1>>}
+ASSUME AllSubSeqs(<<1,1>>) = {<<>>, <<1>>, <<1,1>>}
+ASSUME AllSubSeqs(<<1,1,1>>) = {<<>>, <<1>>, <<1,1>>, <<1,1,1>>}
+
+ASSUME AllSubSeqs(<<1,2,3,4>>) = {<<>>, <<1>>, <<2>>, <<3>>, <<4>>, 
+                                <<1, 2>>, <<1, 3>>, <<1, 4>>, <<2, 3>>, <<2, 4>>, <<3, 4>>,
+                                <<1, 2, 3>>, <<1, 2, 4>>, <<1, 3, 4>>, <<2, 3, 4>>, <<1, 2, 3, 4>>}
+
+ASSUME AllSubSeqs(<<"a","c","b","d","b">>) = 
+  { <<>>, <<"d">>, <<"a">>, <<"c">>, <<"b">>,
+    <<"d","b">>, <<"a","d">>, <<"a","c">>, <<"a","b">>, <<"c","d">>, <<"c","b">>, <<"b","d">>, <<"b","b">>,
+    <<"a","d","b">>, <<"a","c","d">>, <<"a","c","b">>, <<"a","b","d">>, <<"a","b","b">>, <<"c","d","b">>,
+    <<"c","b","d">>, <<"c","b","b">>, <<"b","d","b">>, <<"a","c","d","b">>, <<"a","c","b","d">>, <<"a","c","b","b">>, <<"a","b","d","b">>,
+    <<"c","b","d","b">>, <<"a","c","b","d","b">> }
+
+AllSubSeqsPure(s) ==
+	{ FoldFunction(Snoc, <<>>, [ i \in D |-> s[i] ]) : D \in SUBSET DOMAIN s }
+
+ASSUME \A s \in {<<>>, <<1>>, <<1,1>>, <<1,1,1>>, <<1,2,3,4>>, <<"a","c","b","d","b">>}:
+    AllSubSeqs(s) = AllSubSeqsPure(s)
+
+-----------------------------------------------------------------------------
+
 ASSUME ReplaceFirstSubSeq(<<>>,<<>>,<<>>) = <<>>
 ASSUME ReplaceFirstSubSeq(<<4>>,<<>>,<<>>) = <<4>>
 ASSUME ReplaceFirstSubSeq(<<4>>,<<4>>,<<>>) = <<>>
@@ -369,5 +393,22 @@ ASSUME AssertEq(Suffixes(<<>>), {<<>>})
 ASSUME AssertEq(Suffixes(<<1>>), {<<>>, <<1>>})
 ASSUME AssertEq(Suffixes(<<1,2>>), {<<>>, <<1,2>>, <<2>>})
 ASSUME AssertEq(Suffixes(<<1,2,3>>), {<<>>, <<3>>, <<2,3>>, <<1,2,3>>})
+-----------------------------------------------------------------------------
 
+ASSUME AssertEq(RemoveFirst(<<>>, 1), <<>>)
+ASSUME AssertEq(RemoveFirst(<<1>>, 1), <<>>)
+ASSUME AssertEq(RemoveFirst(<<1,2>>, 1), <<2>>)
+ASSUME AssertEq(RemoveFirst(<<1,2,1>>, 1), <<2,1>>)
+ASSUME AssertEq(RemoveFirst(<<1,2,1,2>>, 2), <<1,1,2>>)
+
+ASSUME AssertEq(RemoveFirstMatch(<<>>, LAMBDA e: e = 1), <<>>)
+ASSUME AssertEq(RemoveFirstMatch(<<1>>, LAMBDA e: e = 1), <<>>)
+ASSUME AssertEq(RemoveFirstMatch(<<1,2>>, LAMBDA e: e = 1), <<2>>)
+ASSUME AssertEq(RemoveFirstMatch(<<1,2,1>>, LAMBDA e: e = 1), <<2,1>>)
+ASSUME AssertEq(RemoveFirstMatch(<<1,2,1,2>>, LAMBDA e: e = 2), <<1,1,2>>)
+
+-----------------------------------------------------------------------------
+
+ASSUME LET seq == <<"a","b","c","d","e">> IN AssertEq(FoldLeftDomain (LAMBDA acc, idx : acc \o seq[idx], "", seq), "abcde")
+ASSUME LET seq == <<"a","b","c","d","e">> IN AssertEq(FoldRightDomain(LAMBDA idx, acc : acc \o seq[idx], seq, ""), "edcba")
 =============================================================================
