@@ -51,6 +51,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 
+import tlc2.util.FP64;
 import tlc2.value.IValue;
 import tlc2.value.impl.BoolValue;
 import tlc2.value.impl.FcnLambdaValue;
@@ -79,10 +80,12 @@ class _Command {
 class _ValueRecord extends _Command {
 
 	public String path = null;
+	public long fingerprint = 0;
 	public String value = null;
 	
-	public _ValueRecord(String path, final String value) {
+	public _ValueRecord(String path, long fingerprint, final String value) {
 		this.path = path;
+		this.fingerprint = fingerprint;
 		this.value = value;
 	}
 }
@@ -149,11 +152,12 @@ class DB extends Thread {
 				this.connection.setAutoCommit(false);
 				Statement statement = this.connection.createStatement();
 				statement.executeUpdate(
-						"create table if not exists state (json_string text);");
-				String insert_stmt = "insert into state values(?)";
+						"create table if not exists state (finger_print long primary key, json_string text not null);");
+				String insert_stmt = "insert into state values(?, ?)"
+						+ "on conflict(finger_print) do nothing;";
 				this.prepared_insert_state_stmt = this.connection.prepareStatement(insert_stmt);
 
-				String query_stmt = "select json_string from state order by json_string;";
+				String query_stmt = "select json_string from state order by finger_print;";
 				this.prepared_query_state_stmt = this.connection.prepareStatement(query_stmt);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -179,6 +183,7 @@ class DB extends Thread {
 					boolean ok = rs.next();
 					if (ok) {
 						String json_string = rs.getString(1);
+						assert(json_string != null);
 						vec.add(json_string);
 					} else {
 						break;
@@ -192,10 +197,11 @@ class DB extends Thread {
 			return vec;
 		}
 
-		public void newValue(String json_string) {
+		public void newValue(long finger_print, String json_string) {
 			try {
 				this.prepared_insert_state_stmt.clearParameters();
-				this.prepared_insert_state_stmt.setString(1, json_string);
+				this.prepared_insert_state_stmt.setLong(1, finger_print);
+				this.prepared_insert_state_stmt.setString(2, json_string);
 				this.prepared_insert_state_stmt.execute();
 				this.stmt_cnt += 1;
 				if (this.stmt_cnt >= MAX_STMT_PER_TRANS) {
@@ -229,8 +235,8 @@ class DB extends Thread {
 	}
 	
 	
-	public void addState(String path, String value) {
-		_Command c = new _ValueRecord(path, value);
+	public void addState(String path, long fingerprint, String value) {
+		_Command c = new _ValueRecord(path, fingerprint, value);
 		try {
 			while (!this.deque.offer(c, 1, TimeUnit.SECONDS)) {
 				this.flushAll();
@@ -288,7 +294,8 @@ class DB extends Thread {
 					} else if (c instanceof _ValueRecord) {
 						_ValueRecord v = (_ValueRecord)c;
 						_DB db = this.openDB(v.path);
-						db.newValue(v.value);
+						assert(v.value != null);
+						db.newValue(v.fingerprint, v.value);
 					}
 				}	
 			} catch (InterruptedException e) {
@@ -377,8 +384,9 @@ public class StateDB {
 	@TLAPlusOperator(identifier = "SaveValue", module = "StateDB", warn = false)
 	public synchronized static BoolValue newState(final Value state, final StringValue path) throws IOException {
 		state.normalize();
+		long fp = state.fingerPrint(FP64.New());
 		String json = toJsonString(state);
-		StateDB.db.addState(path.val.toString(), json);
+		StateDB.db.addState(path.val.toString(), fp, json);
 		return BoolValue.ValTrue;
 	}
 

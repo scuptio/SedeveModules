@@ -169,6 +169,24 @@ RemoveAt(s, i) ==
   (**************************************************************************)
   SubSeq(s, 1, i-1) \o SubSeq(s, i+1, Len(s))
 
+RemoveFirst(s, e) ==
+    (************************************************************************)
+    (* The sequence s with the first occurrence of e removed or s           *)
+    (* iff e \notin Range(s)                                                *)
+    (************************************************************************)
+    IF \E i \in 1..Len(s): s[i] = e
+    THEN RemoveAt(s, SelectInSeq(s, LAMBDA v: v = e))
+    ELSE s
+
+RemoveFirstMatch(s, Test(_)) ==
+    (************************************************************************)
+    (* The sequence s with the first element removed s.t. Test(e) or s      *)
+    (* iff e \notin Range(s)                                                *)
+    (************************************************************************)
+    IF \E i \in 1..Len(s): Test(s[i])
+    THEN RemoveAt(s, SelectInSeq(s, Test))
+    ELSE s
+
 -----------------------------------------------------------------------------
 
 Cons(elt, seq) == 
@@ -176,6 +194,15 @@ Cons(elt, seq) ==
     (* Cons prepends an element at the beginning of a sequence.             *)
     (************************************************************************)
     <<elt>> \o seq
+
+Snoc(elt, seq) == 
+    (************************************************************************)
+    (* Reverses the operands of Sequences!Append for better compatibility   *)
+    (* with FoldFunction below.                                             *)
+    (* Example:                                                             *)
+    (*  FoldSeq(LAMBDA x,y: {x} \cup y, {}, <<1,2,1>>) = Range(<<1,2,1>>)   *)
+    (************************************************************************)
+    Append(seq, elt)
 
 Front(s) == 
   (**************************************************************************)
@@ -305,6 +332,20 @@ FoldRight(op(_, _), seq, base) ==
                  LAMBDA S : Min(S),
                  DOMAIN seq)
 
+FoldLeftDomain(op(_, _), base, seq) == 
+  (***************************************************************************)
+  (* FoldLeftDomain folds op on the domain of seq, i.e., the seq's indices,  *)
+  (* starting at the lowest index.                                           *) 
+  (***************************************************************************)
+  FoldLeft(op, base, [i \in DOMAIN seq |-> i])
+
+FoldRightDomain(op(_, _), seq, base) == 
+  (***************************************************************************)
+  (* FoldRightDomain folds op on the domain of seq, i.e., the seq's indices, *)
+  (* starting at the highest index.                                          *) 
+  (***************************************************************************)
+  FoldRight(op, [i \in DOMAIN seq |-> i], base)
+
 -----------------------------------------------------------------------------
 
 FlattenSeq(seqs) ==
@@ -368,6 +409,21 @@ SubSeqs(s) ==
   (**************************************************************************)
   { SubSeq(s, i+1, j) : i, j \in 0..Len(s) }
 
+AllSubSeqs(s) ==
+  (**************************************************************************)
+  (* SubSeqs(s)                                                             *)
+  (*      \cup                                                              *)
+  (*         { subsequences of s, with arbitrarily many elts removed }      *)
+  (*                                                                        *)
+  (* Example:                                                               *)
+  (*  AllSubSeqs(<<1,2,3,4>>) =                                             *)
+  (*       {<<>>, <<1>>, <<2>>, <<3>>, <<4>>,                               *)
+  (*        <<1, 2>>, <<1, 3>>, <<1, 4>>,                                   *)
+  (*        <<2, 3>>, <<2, 4>>, <<3, 4>>,                                   *)
+  (*        <<1, 2, 3>>, <<1, 2, 4>>, <<1, 3, 4>>, <<2, 3, 4>>,             *)
+  (*        <<1, 2, 3, 4>>}                                                 *)
+  (**************************************************************************)
+  { FoldFunction(Snoc, <<>>, [ i \in D |-> s[i] ]) : D \in SUBSET DOMAIN s }
 
 IndexFirstSubSeq(s, t) ==
   (**************************************************************************)
