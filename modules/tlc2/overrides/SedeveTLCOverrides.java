@@ -35,7 +35,7 @@ package tlc2.overrides;
 // classes which implements `ITLCOverrides` by using, e.g.
 // "-Dtlc2.overrides.TLCOverrides=MyOverrides:MyOverrides2" (use
 // the correct separator (`:` or `;`) according to your OS).
-public class TLCOverrides implements ITLCOverrides {
+public class SedeveTLCOverrides implements ITLCOverrides {
 
 	@SuppressWarnings("rawtypes")
 	@Override
@@ -43,10 +43,8 @@ public class TLCOverrides implements ITLCOverrides {
 		try {
 			// Remove `Json.resolves();` call when this Class is moved to `TLC`.
 			Json.resolves();
-			return new Class[] { IOUtils.class, SVG.class, SequencesExt.class, Json.class, Bitwise.class,
-					FiniteSetsExt.class, Functions.class, CSV.class, Combinatorics.class, BagsExt.class,
-					DyadicRationals.class, Statistics.class, VectorClocks.class, GraphViz.class,
-					StateDB.class,
+			return new Class[] { 
+				   StateDB.class,
 					GenID.class		
 			};
 		} catch (NoClassDefFoundError e) {
@@ -54,9 +52,7 @@ public class TLCOverrides implements ITLCOverrides {
 			System.out.println("gson dependencies of Json overrides not found, Json module won't work unless "
 					+ "the libraries in the lib/ folder of the CommunityModules have been added to the classpath of TLC.");
 		}
-		return new Class[] { IOUtils.class, SVG.class, SequencesExt.class, Bitwise.class, FiniteSetsExt.class,
-				Functions.class, CSV.class, Combinatorics.class, BagsExt.class, DyadicRationals.class,
-				Statistics.class, VectorClocks.class, GraphViz.class,
+		return new Class[] {
 				StateDB.class,
 				GenID.class
 		};

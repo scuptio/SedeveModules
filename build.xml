@@ -160,7 +160,7 @@
 			<arg value="-cleanup"/>
 			<arg value="-deadlock"/>
 			<arg value="-noGenerateSpecTE"/>
-			<arg value="${basedir}/tests/GH037/ShiVizTests"/>
+
 
 			<classpath>
 				<pathelement location="${tlc}/tla2tools.jar" />
@@ -168,14 +168,6 @@
 				<pathelement location="${dist}/CommunityModules-${timestamp}-deps.jar" />
 			</classpath>
 		</java>
-	    <fail message="ERROR: ShiViz test failed">
-	        <condition>
-	            <not>
-	            	<!-- Assert that TLC's error code is 13, which is the code corresponding to a liveness violation. -->
-	                <equals arg1="${shiviz.return.value}" arg2="13"/>
-	            </not>
-	        </condition>
-	    </fail>
 	</target>
 
 	<target name="clean" description="Delete the ${build}, ${tlc} and ${dist} directory trees">
