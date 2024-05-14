@@ -41,8 +41,6 @@ public class SedeveTLCOverrides implements ITLCOverrides {
 	@Override
 	public Class[] get() {
 		try {
-			// Remove `Json.resolves();` call when this Class is moved to `TLC`.
-			Json.resolves();
 			return new Class[] { 
 				   StateDB.class,
 					GenID.class		
