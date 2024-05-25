@@ -1,4 +1,3 @@
-package tlc2.overrides;
 /*******************************************************************************
  * Copyright (c) 2019 Microsoft Research. All rights reserved.
  * Copyright (c) 2024 Scuptio. All rights reserved.
