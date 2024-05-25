@@ -1,6 +1,7 @@
 /*******************************************************************************
  * Copyright (c) 2019 Microsoft Research. All rights reserved. 
- *
+ * Copyright (c) 2024 Scuptio. All rights reserved.
+ * 
  * The MIT License (MIT)
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy 
@@ -48,7 +49,7 @@ public class SedeveTLCOverrides implements ITLCOverrides {
 		} catch (NoClassDefFoundError e) {
 			// Remove this catch when this Class is moved to `TLC`.
 			System.out.println("gson dependencies of Json overrides not found, Json module won't work unless "
-					+ "the libraries in the lib/ folder of the CommunityModules have been added to the classpath of TLC.");
+					+ "the libraries in the lib/ folder of the SedeveModules have been added to the classpath of TLC.");
 		}
 		return new Class[] {
 				StateDB.class,

@@ -1,7 +1,8 @@
 package tlc2.overrides;
 /*******************************************************************************
  * Copyright (c) 2019 Microsoft Research. All rights reserved.
- *
+ * Copyright (c) 2024 Scuptio. All rights reserved.
+ * 
  * The MIT License (MIT)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,8 +22,6 @@ package tlc2.overrides;
  * AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * Contributors:
- *   Markus Alexander Kuppe - initial API and implementation
  ******************************************************************************/
 
 // modified from Json.java

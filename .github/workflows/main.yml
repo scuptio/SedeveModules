@@ -42,8 +42,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/CommunityModules-${{steps.date.outputs.date}}.jar
-        asset_name: CommunityModules-${{steps.date.outputs.date}}.jar
+        asset_path: dist/SedeveModules-${{steps.date.outputs.date}}.jar
+        asset_name: SedeveModules-${{steps.date.outputs.date}}.jar
         asset_content_type: application/zip
     - name: Upload dateless Release Asset
       id: upload-dateless-release-asset 
@@ -53,8 +53,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/CommunityModules.jar
-        asset_name: CommunityModules.jar
+        asset_path: dist/SedeveModules.jar
+        asset_name: SedeveModules.jar
         asset_content_type: application/zip
     - name: Upload Release Asset
       id: upload-release-asset-deps
@@ -64,8 +64,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/CommunityModules-deps-${{steps.date.outputs.date}}.jar
-        asset_name: CommunityModules-deps-${{steps.date.outputs.date}}.jar
+        asset_path: dist/SedeveModules-deps-${{steps.date.outputs.date}}.jar
+        asset_name: SedeveModules-deps-${{steps.date.outputs.date}}.jar
         asset_content_type: application/zip
     - name: Upload dateless Release Asset
       id: upload-dateless-release-asset-deps
@@ -75,6 +75,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/CommunityModules-deps.jar
-        asset_name: CommunityModules-deps.jar
+        asset_path: dist/SedeveModules-deps.jar
+        asset_name: SedeveModules-deps.jar
         asset_content_type: application/zip

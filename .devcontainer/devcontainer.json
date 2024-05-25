@@ -1,5 +1,5 @@
 {
-    "name": "TLA+ CommunityModules",
+    "name": "TLA+ SedeveModules",
   
     // Install optional extension. If this fails, it just degrades the convenience factor.
     "extensions": [

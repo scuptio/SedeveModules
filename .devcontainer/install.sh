@@ -12,7 +12,7 @@ wget -qN https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.j
 echo "alias tlcrepl='java -cp /workspace/ewd998/tools/tla2tools.jar:/workspaces/ewd998/tools/tla2tools.jar tlc2.REPL'" >> $HOME/.bashrc
 echo "alias tlc='java -cp /workspace/ewd998/tools/tla2tools.jar:/workspaces/ewd998/tools/tla2tools.jar tlc2.TLC'" >> $HOME/.bashrc
 
-## Install Apache Ant that builds CommunityModules (see build.xml)
+## Install Apache Ant that builds SedeveModules (see build.xml)
 sudo apt-get update
 sudo apt-get install -y ant
 

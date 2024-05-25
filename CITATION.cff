@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: TLA+ CommunityModules
+title: TLA+ SedeveModules
 message: Please cite this software using these metadata.
 type: software
 authors:
@@ -32,4 +32,4 @@ authors:
     family-names: Wayne
   - given-names: Jobvs
 version: 1.0.0
-url: "https://github.com/tlaplus/CommunityModules"
+url: "https://github.com/tlaplus/SedeveModules"
