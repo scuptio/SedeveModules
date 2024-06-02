@@ -53,4 +53,4 @@ ant test
 Download
 --------
 
-![CI](https://github.com/scuptio/TLAPlusSedeveModules/workflows/CI/badge.svg)
+![CI](https://github.com/scuptio/SedeveModules/workflows/CI/badge.svg)
